@@ -1,3 +1,5 @@
+import io
+
 import cv2
 import signal
 import shutil
@@ -300,7 +302,22 @@ class DisjunctiveGraphJspVisualizer:
         # convert canvas to image
         fig.canvas.draw()
         img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        try:
+            # with scientific mode enabled in pycharm this code works
+            # no idea why enabling scientific mode in pycharm changes anything at all :o
+            # img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            w, h = fig.canvas.get_width_height()
+            img = img.reshape((h, w, 3))
+        except ValueError:
+            w, h = fig.canvas.get_width_height()
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=self.dpi)
+            buf.seek(0)
+            img_arr = np.frombuffer(buf.getvalue(), dtype=np.uint8)
+            buf.close()
+            img = cv2.imdecode(img_arr, 1)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img = img.reshape((h, w, 3))
         # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
         # clear current frame
@@ -397,7 +414,7 @@ class DisjunctiveGraphJspVisualizer:
             row = f"{row:<{len_prefix}}"
             for task_in_job in range(n_machines):
                 task_id = task_id + 1
-                if task_id < len(G.nodes)-1:
+                if task_id < len(G.nodes) - 1:
                     node = G.nodes[task_id]
                     node_str = "●" if node["scheduled"] else "◯"
                     r, g, b, *_ = node["color"]
