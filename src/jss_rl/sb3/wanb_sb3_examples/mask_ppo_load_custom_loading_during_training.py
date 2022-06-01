@@ -9,28 +9,30 @@ import torch as th
 from rich.progress import track
 
 import jss_utils.PATHS as PATHS
-import jss_utils.jsp_instance_parser as parser
-import jss_utils.jsp_instance_details as details
+import jss_utils.jsp_env_utils as env_utils
 
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
+
+from jss_rl.sb3.util.dynamic_custom_instance_loader_callback import DynamicCustomInstanceLoaderCallback
 from jss_rl.sb3.util.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 
 from jss_utils.jss_logger import log
 
 PROJECT = "JSP-test"
-BENCHMARK_INSTANCE_NAME = "ft06"
+N_JOBS = 4
+N_MACHINES = 4
 
 wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
 
-jsp_instance = parser.get_instance_by_name(BENCHMARK_INSTANCE_NAME)
-jsp_instance_details = details.get_jps_instance_details(BENCHMARK_INSTANCE_NAME)
-
-_, n_jobs, n_machines = jsp_instance.shape
+jsp_instance, jsp_details, name = env_utils.get_random_custom_instance_and_details_and_name(
+    n_jobs=N_JOBS,
+    n_machines=N_MACHINES
+)
 
 gym.envs.register(
     id='GraphJsp-v0',
@@ -39,13 +41,14 @@ gym.envs.register(
 )
 
 config = {
-    "total_timesteps": 1_000,
+    "total_timesteps": 250_000,
     "n_envs": 8,  # multiprocessing.cpu_count()-1
+    "load_instance_interval": 10,
 
-    "instance_name": BENCHMARK_INSTANCE_NAME,
-    "instance_details": jsp_instance_details,
-    "n_jobs": n_jobs,
-    "n_machines": n_machines,
+    "instance_name": name,
+    "instance_details": jsp_details,
+    "n_jobs": N_JOBS,
+    "n_machines": N_MACHINES,
 
     "policy_type": MaskableActorCriticPolicy,
     "model_hyper_parameters": {
@@ -111,7 +114,7 @@ if __name__ == '__main__':
 
     env_kwargs = {
         "jps_instance": jsp_instance,
-        "scaling_divisor": jsp_instance_details["lower_bound"],
+        "scaling_divisor": jsp_details["lower_bound"],
         **config["env_kwargs"]
     }
 
@@ -120,7 +123,6 @@ if __name__ == '__main__':
 
     def mask_fn(env):
         return env.valid_action_mask()
-
 
     venv = make_vec_env(
         env_id=config["env_name"],
@@ -150,10 +152,14 @@ if __name__ == '__main__':
         **config["EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs"],
     )
 
+    instance_loader_cb = DynamicCustomInstanceLoaderCallback(
+        load_instance_every_n_rollouts=config["load_instance_interval"]
+    )
+
     log.info(f"training the agent")
     model.learn(
         total_timesteps=config["total_timesteps"],
-        callback=[wb_cb, logger_cb]
+        callback=[wb_cb, logger_cb, instance_loader_cb]
     )
 
     # somehow the mask ppo does not work trigger properly. the step appears to count only to the batch size and then

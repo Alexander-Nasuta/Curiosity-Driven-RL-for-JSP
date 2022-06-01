@@ -25,7 +25,7 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
 
     start = time.perf_counter()
 
-    job_processing_times = np.sum(jsp[1], axis=1)
+    job_processing_times = np.sum(jsp_instance[1], axis=1)
 
     while not done:
         possible_actions = env.valid_action_mask()
@@ -49,6 +49,7 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
             action, _ = min(candidates, key=lambda data: data[1])
             action = action - 1  # node/task to action shift
             n_state, reward, done, info = env.step(action=action)
+            continue
 
         t += 1
 
@@ -62,12 +63,12 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
         env.render(show=["gantt_console"])
         log.info(f"solving duration: {solving_duration:2f} sec")
 
-    df = env.network_as_dataframe()
     makespan = info["makespan"]
-    info["FCFS_solving_duration"] = solving_duration
-    info["FCFS_makespan"] = solving_duration
+    info["solving_duration"] = solving_duration
+    info["SPT_solving_duration"] = solving_duration
+    info["SPT_makespan"] = solving_duration
 
-    return makespan, df, info
+    return makespan, info
 
 
 if __name__ == '__main__':

@@ -9,6 +9,8 @@ resources/logs/tensorboard_logs/
 resources/jps_instance_details/
 resources/rl_output/
 
+*/wandb/*
+
 
 # C extensions
 *.so

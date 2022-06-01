@@ -378,6 +378,7 @@ class DisjunctiveGraphJssEnv(gym.Env):
             reward = - makespan / self.scaling_divisor if self.scale_reward else - makespan
 
             info["makespan"] = makespan
+            info["gantt_df"] = self.network_as_dataframe()
             log.info(f"makespan: {makespan}, reward: {reward:.2f}")
 
         info["extrinsic_reward"] = reward

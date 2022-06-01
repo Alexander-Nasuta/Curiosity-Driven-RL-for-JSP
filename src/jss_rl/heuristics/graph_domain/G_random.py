@@ -14,7 +14,7 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
     env = DisjunctiveGraphJssEnv(
         jps_instance=jsp_instance,
         perform_left_shift_if_possible=False,
-        scaling_divisor=optimal_makespan,
+        scaling_divisor=None,
         scale_reward=False,
         normalize_observation_space=True,
         flat_observation_space=True,
@@ -37,12 +37,12 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
         env.render(show=["gantt_console"])
         log.info(f"solving duration: {solving_duration:2f} sec")
 
-    df = env.network_as_dataframe()
     makespan = info["makespan"]
-    info["STT_solving_duration"] = solving_duration
-    info["STT_makespan"] = solving_duration
+    info["solving_duration"] = solving_duration
+    info["G_random_solving_duration"] = solving_duration
+    info["G_random_makespan"] = solving_duration
 
-    return makespan, df, info
+    return makespan, info
 
 
 if __name__ == '__main__':

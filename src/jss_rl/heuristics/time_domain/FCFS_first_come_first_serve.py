@@ -41,18 +41,18 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
         env.render(show=["gantt_console"])
         log.info(f"solving duration: {solving_duration:2f} sec")
 
-    df = env.network_as_dataframe()
     makespan = info["makespan"]
+    info["solving_duration"] = solving_duration
     info["FCFS_solving_duration"] = solving_duration
     info["FCFS_makespan"] = solving_duration
 
-    return makespan, df, info
+    return makespan, info
 
 
 if __name__ == '__main__':
     import jss_utils.jsp_or_tools_solver as or_solver
 
-    jsp = parser.get_instance_by_name("ta01")
+    jsp = parser.get_instance_by_name("ft06")
 
     optimal_makespan, *_ = or_solver.solve_jsp(jsp_instance=jsp, plot_results=False)
     makespan, *_ = solve_jsp(jsp_instance=jsp)

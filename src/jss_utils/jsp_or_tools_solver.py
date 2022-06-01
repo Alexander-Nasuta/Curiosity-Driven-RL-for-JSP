@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import jss_utils.jsp_instance_parser as parser
 import jss_utils.jsp_instance_details as details
 
-
 from ortools.sat.python import cp_model
 
 from jss_utils.jss_logger import log
@@ -111,6 +110,9 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True) -> (float, st
         # visualizer.render_gantt_in_window(df, colors=colors, wait=None)
 
         info = {
+            "makespan": makespan,
+            "solving_duration": solving_duration,
+            "gantt_df": df,
             "or_tools_status": status,
             "or_tools_solving_duration": solving_duration,
             "or_tools_makespan": makespan
@@ -123,7 +125,7 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True) -> (float, st
 
 
 if __name__ == '__main__':
-    instance_name = "ft06"
+    instance_name = "ta01"
 
     jsp = parser.get_instance_by_name(instance_name)
     makespan, status, *_ = solve_jsp(jsp_instance=jsp)

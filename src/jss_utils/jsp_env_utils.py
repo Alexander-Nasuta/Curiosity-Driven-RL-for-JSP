@@ -1,7 +1,11 @@
+import random
+
 import numpy as np
 
+import jss_utils.PATHS as PATHS
 import jss_utils.jsp_instance_parser as parser
 import jss_utils.jsp_instance_details as details
+import jss_utils.jsp_custom_instance_generator as jsp_gen
 
 from typing import Union
 
@@ -17,7 +21,13 @@ def get_benchmark_instance_and_lower_bound(name: str) -> (np.array, float):
     return jps_instance, jsp_instance_details["lower_bound"]
 
 
-def get_pre_configured_example_env(name="ft6", **kwargs) -> DisjunctiveGraphJssEnv:
+def get_benchmark_instance_and_details(name: str) -> (np.array, float):
+    jsp_instance_details = details.get_jps_instance_details(name)
+    jps_instance = parser.get_instance_by_name(name)
+    return jps_instance, jsp_instance_details
+
+
+def get_pre_configured_example_env(name="ft06", **kwargs) -> DisjunctiveGraphJssEnv:
     env = DisjunctiveGraphJssEnv(**kwargs)
     return load_benchmark_instance_to_environment(env=env, name=name)
 
@@ -60,5 +70,22 @@ def load_benchmark_instance_to_environment(env: Union[DisjunctiveGraphJssEnv, Ve
         raise ValueError(error_msg)
 
 
+def get_random_custom_instance_and_details_and_name(n_jobs: int, n_machines: int) -> (np.ndarray, dict, str):
+    dir = PATHS.JSP_INSTANCES_CUSTOM_PATH.joinpath(f"{n_jobs}x{n_machines}")
+
+    if not dir.exists():
+        log.info(f"there are no custom instances of size ({n_jobs},{n_machines}) in the resource directory. "
+                 f"Therefore some will be generated.")
+        jsp_gen.generate_jsp_instances(n_jobs=n_jobs, n_machines=n_machines)
+
+    instance = random.choice([*dir.glob('*.txt')])
+
+    jsp, _ = parser.parse_jps_taillard_specification(instance_path=instance)
+    name = instance.stem
+    custom_jsp_details = details.get_custom_instance_details(name)
+
+    return jsp, custom_jsp_details, name
+
+
 if __name__ == '__main__':
-    load_benchmark_instance_to_environment()
+    get_random_custom_instance_and_details_and_name(n_jobs=4, n_machines=4)

@@ -1,5 +1,8 @@
+import datetime
+
 import gym
 import pprint
+import time
 
 import numpy as np
 import sb3_contrib
@@ -39,7 +42,7 @@ gym.envs.register(
 )
 
 config = {
-    "total_timesteps": 1_000,
+    "total_timesteps": 100_000,
     "n_envs": 8,  # multiprocessing.cpu_count()-1
 
     "instance_name": BENCHMARK_INSTANCE_NAME,
@@ -97,6 +100,8 @@ config = {
 
 if __name__ == '__main__':
     log.info(f"config: {pprint.pformat(config)}")
+
+    start = time.perf_counter()
 
     run = wb.init(
         project=PROJECT,
@@ -189,3 +194,10 @@ if __name__ == '__main__':
 
     del venv
     run.finish()
+
+    end = time.perf_counter()
+    solving_duration = end - start
+
+    for i in range(25, 2_001, 25):
+        dur = datetime.timedelta(seconds=int(i * solving_duration))
+        log.info(f"cost for {i} runs with {config['total_timesteps']} timesteps and {config['n_envs']} envs: {dur}")

@@ -1,4 +1,5 @@
-import sys
+import time
+import datetime
 
 import numpy as np
 import sb3_contrib
@@ -15,6 +16,12 @@ from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.common.env_util import make_vec_env
 
+N_ENVS = 4
+VISUALISATIONS = [
+    "gantt_window",
+    "graph_window",  # very expensive
+]
+
 if __name__ == '__main__':
     jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
 
@@ -25,7 +32,8 @@ if __name__ == '__main__':
         "perform_left_shift_if_possible": True,
         "scale_reward": True,
         "normalize_observation_space": True,
-        "flat_observation_space": True
+        "flat_observation_space": True,
+        "default_visualisations": VISUALISATIONS
     }
 
     log.info("setting up vectorised environment")
@@ -42,7 +50,7 @@ if __name__ == '__main__':
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
 
-        n_envs=1)
+        n_envs=N_ENVS)
 
     model = sb3_contrib.MaskablePPO(
         MaskableActorCriticPolicy,
@@ -50,29 +58,34 @@ if __name__ == '__main__':
         verbose=1,
     )
 
-    total_timesteps = 2_000
+    total_timesteps = 20_000
 
-    model.learn(total_timesteps=total_timesteps)
+    # model.learn(total_timesteps=total_timesteps)
 
     log.info("setting up video recorder")
-    episode_len = venv.envs[0].total_tasks_without_dummies
+    video_len = 10
 
     venv = VecVideoRecorder(
         venv,
         PATHS.SB3_EXAMPLES_VIDEO,
         record_video_trigger=lambda x: x == 0,
-        video_length=episode_len,
-        name_prefix=f"venv_mask_ppo_video")
+        video_length=video_len,
+        name_prefix=f"video_cost_estimator")
 
     obs = venv.reset()
-    for _ in track(range(episode_len), description="recording frames ..."):
+    start = time.perf_counter()
+    for _ in track(range(video_len), description="recording frames ..."):
         masks = np.array([env.action_masks() for env in model.env.envs])
         action, _ = model.predict(observation=obs, deterministic=False, action_masks=masks)
         obs, _, _, _ = venv.step(action)
 
-    # Save the video
-    log.info("saving video...")
-    venv.close()
+    end = time.perf_counter()
+
+    recording_duration = end - start
+    log.info(f"recording duration: {recording_duration:2f} sec for {video_len} frames using {N_ENVS} environments")
+    for i in range(5, 101, 5):
+        dur = datetime.timedelta(seconds=int(i * recording_duration))
+        log.info(f"cost for {i * video_len:>4} frames: {dur}")
 
     # somehow VecVideoRecorder crashes at the end of the script (when __del__() in VecVideoRecorder is called)
     # for some reason there are no issues when deleting env manually

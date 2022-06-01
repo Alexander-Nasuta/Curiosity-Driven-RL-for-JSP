@@ -77,6 +77,19 @@ def parse_instance_details() -> Dict:
     return details_dict
 
 
+def parse_custom_instance_details() -> Dict:
+    """
+    reads 'jps_instance_details/custom_instance_details.json' file and returns it as a dictionary.
+
+    make sure to download the instance details beforehand (run 'download_benchmark_instances_details' once)
+
+    :return: the 'jps_instance_details/custom_instance_details.json'-file as a python dictionary
+    """
+    with open(PATHS.JPS_CUSTOM_INSTANCES_DETAILS_FILE_PATH) as f:
+        details_dict = json.load(f)
+    return details_dict
+
+
 def get_jps_instance_details(instance: str) -> Dict:
     """
     looks up the details-entry that corresponds to the specified instance in the
@@ -131,6 +144,17 @@ def update_custom_instance_details() -> None:
     with open(PATHS.JPS_CUSTOM_INSTANCES_DETAILS_FILE_PATH, 'w') as fp:
         json.dump(details_dict, fp, indent=4)
 
+
+def get_custom_instance_details(name: str) -> dict:
+    all_details = parse_custom_instance_details()
+
+    if name not in all_details.keys():
+        log.info(f"there are no details for the custom instance '{name}' in the details file. "
+                 f"updating details file and retrying...")
+        update_custom_instance_details()
+        if name not in all_details.keys():
+            raise ValueError(f"the requested custom instance '{name}' seems not to exists in the resource folder.")
+    return all_details[name]
 
 
 if __name__ == '__main__':
