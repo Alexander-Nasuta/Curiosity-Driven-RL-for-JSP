@@ -68,7 +68,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
                  c_map: str = "rainbow",
                  dummy_task_color="tab:gray",
                  default_visualisations: List[str] = None,
-                 visualizer_kwargs: dict = None
+                 visualizer_kwargs: dict = None,
+                 verbose: int = 0
                  ):
         """
 
@@ -127,6 +128,10 @@ class DisjunctiveGraphJssEnv(gym.Env):
 
         :param visualizer_kwargs:               additional keyword arguments for
                                                 `jss_graph_env.DisjunctiveGraphJspVisualizer`
+
+        :param verbose:                         0 = no information printed console,
+                                                1 = 'important' printed to console,
+                                                2 = all information printed to console,
         """
         # Note: None-fields will be populated in the 'load_instance' method
         self.size = None
@@ -171,6 +176,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
         self.dummy_task_machine = -1
         self.dummy_task_job = -1
         self.dummy_task_color = dummy_task_color
+
+        self.verbose = verbose
 
         if jps_instance is not None:
             self.load_instance(jsp_instance=jps_instance, scaling_divisor=scaling_divisor)
@@ -220,9 +227,10 @@ class DisjunctiveGraphJssEnv(gym.Env):
         if self.scale_reward and scaling_divisor:
             self.scaling_divisor = scaling_divisor
         elif self.scale_reward and not scaling_divisor:
-            log.warning(
-                "defaulting scaling_divisor to an naive lower bound. You might consider setting 'scaling_divisor'"
-                " to a lower bound calculated by a suitable heuristic or Google Or tools for better performance.")
+            if self.verbose > 0:
+                log.warning(
+                    "defaulting scaling_divisor to an naive lower bound. You might consider setting 'scaling_divisor'"
+                    " to a lower bound calculated by a suitable heuristic or Google Or tools for better performance.")
             self.scaling_divisor = np.sum(jsp_instance[1], axis=1).min()  # shortest job
 
         # naive upper bound
@@ -336,7 +344,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
         if self.action_mode == 'task':
             task_id = action + 1
 
-            log.debug(f"handling action={action} (Task {task_id})")
+            if self.verbose > 1:
+                log.info(f"handling action={action} (Task {task_id})")
             info = {
                 **info,
                 **self._schedule_task(task_id=task_id)
@@ -346,12 +355,13 @@ class DisjunctiveGraphJssEnv(gym.Env):
             job_mask = np.array_split(task_mask, self.n_jobs)[action]
 
             if True not in job_mask:
-                log.info(f"job {action} is already completely scheduled. Ignoring it.")
+                if self.verbose > 0:
+                    log.info(f"job {action} is already completely scheduled. Ignoring it.")
                 info["valid_action"] = False
             else:
                 task_id = 1 + action * self.n_machines + np.argmax(job_mask)
-
-                log.debug(f"handling job={action} (Task {task_id})")
+                if self.verbose > 1:
+                    log.info(f"handling job={action} (Task {task_id})")
                 info = {
                     **info,
                     **self._schedule_task(task_id=task_id)
@@ -379,7 +389,9 @@ class DisjunctiveGraphJssEnv(gym.Env):
 
             info["makespan"] = makespan
             info["gantt_df"] = self.network_as_dataframe()
-            log.info(f"makespan: {makespan}, reward: {reward:.2f}")
+            info["extrinsic_return"] = reward
+            if self.verbose > 0:
+                log.info(f"makespan: {makespan}, return: {reward:.2f}")
 
         info["extrinsic_reward"] = reward
         info["scaling_divisor"] = self.scaling_divisor
@@ -494,7 +506,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
         node = self.G.nodes[task_id]
 
         if node["scheduled"]:
-            log.info(f"task {task_id} is already scheduled. ignoring it.")
+            if self.verbose > 0:
+                log.info(f"task {task_id} is already scheduled. ignoring it.")
             return {
                 "valid_action": False,
                 "node_id": task_id,
@@ -506,8 +519,9 @@ class DisjunctiveGraphJssEnv(gym.Env):
         prev_job_node = self.G.nodes[prev_task_in_job_id]
 
         if not prev_job_node["scheduled"]:
-            log.debug(f"the previous task (T{prev_task_in_job_id}) in the job is not scheduled jet. "
-                      f"Not scheduling task T{task_id} to avoid cycles in the graph.")
+            if self.verbose > 1:
+                log.info(f"the previous task (T{prev_task_in_job_id}) in the job is not scheduled jet. "
+                         f"Not scheduling task T{task_id} to avoid cycles in the graph.")
             return {
                 "valid_action": False,
                 "node_id": task_id,
@@ -580,8 +594,9 @@ class DisjunctiveGraphJssEnv(gym.Env):
                     # insert task at the corresponding place in the machine routes list
                     self.machine_routes[m_id] = np.insert(self.machine_routes[m_id], i + 1, task_id)
 
-                    log.debug(
-                        f"scheduled task {task_id} on machine {m_id} between task {m_prev:.0f} and task {m_next:.0f}")
+                    if self.verbose > 1:
+                        log.info(f"scheduled task {task_id} on machine {m_id} between task {m_prev:.0f} "
+                                 f"and task {m_next:.0f}")
                     # self.render(show=["gantt_console"])
                     return {
                         "start_time": st,

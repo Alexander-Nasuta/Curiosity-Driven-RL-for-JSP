@@ -138,6 +138,8 @@ small_banner = f"""
     E-mail:     {CBLUE}{CBOLD}alexander.nasuta@rwth-aachen.de{CEND},
                 {CGREY}alexander.nasuta@ima.rwth-aachen.de{CEND},
                 {CGREY}alexander@nasuta.eu{CEND}
+                
+    Supervisor: {CBLUE}{CBOLD}Marco Kemmerling{CEND}, {CBLUE}Ingrid Isenhardt{CEND}
 {terminal_notefication if isRunningInPyCharm and logname != 'qwerty' else ''}
 """
 

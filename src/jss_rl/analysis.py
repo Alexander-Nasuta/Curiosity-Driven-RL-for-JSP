@@ -113,4 +113,4 @@ def compare_benchmark_results(name: str) -> None:
 
 
 if __name__ == '__main__':
-    compare_benchmark_results("ta01")
+    compare_benchmark_results("ft06")
