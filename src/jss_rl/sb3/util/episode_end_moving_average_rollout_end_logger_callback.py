@@ -1,3 +1,4 @@
+from statistics import mean
 from typing import List, Callable
 
 from stable_baselines3.common.callbacks import BaseCallback
@@ -21,13 +22,24 @@ class EpisodeEndMovingAverageRolloutEndLoggerCallback(BaseCallback):
             for field in self.log_fields:
                 val = env_info[field]
                 self.memory[field].add(val)
-                if self.wandb_ref:
-                    self.wandb_ref.log({field: val})
+        if self.wandb_ref and len(env_infos):
+            for field in self.log_fields:
+                vals = [ev[field] for ev in self.locals['infos'] if field in ev.keys()]
+                if len(vals):
+                    mean_val = mean(vals)
+                    self.wandb_ref.log({
+                        field: mean_val,
+                        "num_timesteps": self.num_timesteps
+                    })
         return True
 
     def _on_rollout_end(self) -> bool:
         for field in self.log_fields:
             self.logger.record(f"rollout/{field}", self.memory[field].mean())
             if self.wandb_ref:
-                self.wandb_ref.log({field: self.memory[field].mean()})
+                self.wandb_ref.log({
+                    field: self.memory[field].mean(),
+                    "num_timesteps": self.num_timesteps
+                })
+
         return True

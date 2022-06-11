@@ -1,3 +1,4 @@
+from statistics import mean
 from typing import List, Callable
 
 from stable_baselines3.common.callbacks import BaseCallback
@@ -5,14 +6,14 @@ from stable_baselines3.common.callbacks import BaseCallback
 from jss_rl.sb3.util.moving_avarage import MovingAverage
 
 
-class InfoFieldMovingAvarageLogger(BaseCallback):
+class InfoFieldMovingAverageLogger(BaseCallback):
 
     def __init__(self,
                  fields: List[str],
                  field_capacities: List[int],
                  wandb_ref=None,
                  verbose=0):
-        super(InfoFieldMovingAvarageLogger, self).__init__(verbose)
+        super(InfoFieldMovingAverageLogger, self).__init__(verbose)
         self.log_fields = fields
         self.wandb_ref = wandb_ref
 
@@ -35,13 +36,23 @@ class InfoFieldMovingAvarageLogger(BaseCallback):
                     continue
                 val = env_info[field]
                 self.memory[field].add(val)
-                if self.wandb_ref:
-                    self.wandb_ref.log({field: val})
+        if self.wandb_ref:
+            for field in self.log_fields:
+                vals = [ev[field] for ev in self.locals['infos'] if field in ev.keys()]
+                if len(vals):
+                    mean_val = mean(vals)
+                    self.wandb_ref.log({
+                        field: mean_val,
+                        "num_timesteps": self.num_timesteps
+                    })
         return True
 
     def _on_rollout_end(self) -> bool:
         for field in self.log_fields:
             self.logger.record(f"rollout/{field}", self.memory[field].mean())
             if self.wandb_ref:
-                self.wandb_ref.log({f"rollout/{field}": self.memory[field].mean()})
+                self.wandb_ref.log({
+                    f"rollout/{field}": self.memory[field].mean(),
+                    "num_timesteps": self.num_timesteps
+                })
         return True

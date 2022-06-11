@@ -20,14 +20,14 @@ from wandb.integration.sb3 import WandbCallback
 from jss_rl.sb3.curiosity.icm_wrapper import IntrinsicCuriosityModuleWrapper
 from jss_rl.sb3.util.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
-from jss_rl.sb3.util.info_field_moving_avarege_logger_callback import InfoFieldMovingAvarageLogger
+from jss_rl.sb3.util.info_field_moving_avarege_logger_callback import InfoFieldMovingAverageLogger
 from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_rl.sb3.util.progress_bar_callback import ProgressBarCallback
 
 from jss_utils.jss_logger import log
 
 PROJECT = "JSP-test"
-BENCHMARK_INSTANCE_NAME = "ft06"
+BENCHMARK_INSTANCE_NAME = "ta01"
 
 wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
 
@@ -43,8 +43,8 @@ gym.envs.register(
 )
 
 config = {
-    "total_timesteps": 100_000,
-    "n_envs": 6,  # multiprocessing.cpu_count()-1
+    "total_timesteps": 500_000,
+    "n_envs": 9,  # multiprocessing.cpu_count()-1
 
     "instance_name": BENCHMARK_INSTANCE_NAME,
     "instance_details": jsp_instance_details,
@@ -53,7 +53,7 @@ config = {
 
     "policy_type": MaskableActorCriticPolicy,
     "model_hyper_parameters": {
-        "gamma": 0.99,  # discount factor,
+        "gamma": 0.99999,  # discount factor,
         "gae_lambda": 0.95,
         "learning_rate": 3e-4,
         "batch_size": 64,
@@ -91,7 +91,7 @@ config = {
 
     "icm_wrapper_kwargs": {
         "beta": 0.2,
-        "eta": 10.0,
+        "eta": 0.005,
         "lr": 1e-3,
         "device": 'cpu',
         "feature_dim": 288,
@@ -103,9 +103,11 @@ config = {
         "forward_fcnet_net_activation": th.nn.Tanh(),
         "postprocess_every_n_steps": 100,
         "postprocess_sample_size": 100,
-        "memory_capacity": 10_000,
+        "memory_capacity": 1_000,
         "shuffle_memory_samples": True,
         "clear_memory_on_reset": False,
+
+        "exploration_steps": 300_000
     },
 
     "EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs": {
@@ -129,7 +131,8 @@ config = {
             100,
             100
         ],
-    }
+    },
+    "record_video": False
 }
 
 if __name__ == '__main__':
@@ -139,8 +142,8 @@ if __name__ == '__main__':
         project=PROJECT,
         config=config,
         sync_tensorboard=True,
-        monitor_gym=True,  # auto-upload the videos of agents playing the game
-        save_code=True,  # optional
+        monitor_gym=False,  # auto-upload the videos of agents playing the game
+        save_code=False,  # optional
         dir=f"{PATHS.WANDB_PATH}/",
     )
 
@@ -173,7 +176,7 @@ if __name__ == '__main__':
         return env.valid_action_mask()
 
 
-    venv = make_vec_env_without_monitor(
+    blank_venv = make_vec_env_without_monitor(
         env_id=config["env_name"],
         env_kwargs=env_kwargs,
         wrapper_class=ActionMasker,
@@ -182,7 +185,7 @@ if __name__ == '__main__':
     )
 
     venv = IntrinsicCuriosityModuleWrapper(
-        venv=venv,
+        venv=blank_venv,
         **config["icm_wrapper_kwargs"]
     )
 
@@ -213,7 +216,7 @@ if __name__ == '__main__':
         **config["EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs"],
     )
 
-    log_field_if_present_logger_cb = InfoFieldMovingAvarageLogger(
+    log_field_if_present_logger_cb = InfoFieldMovingAverageLogger(
         wandb_ref=wb,
         **config["InofFieldMovingAvarageLogger_kwargs"],
     )
@@ -227,41 +230,45 @@ if __name__ == '__main__':
             callback=[wb_cb, episode_logger_cb, log_field_if_present_logger_cb, pb_cb]
         )
 
-    # somehow the mask ppo does not work trigger properly. the step appears to count only to the batch size and then
-    # start again at step 0
-    # therefore here is a workaround
-    log.info(f"setting up video recorder")
 
-    _, n_jobs, n_machines = jsp_instance.shape
-    episode_len = n_jobs * n_machines
+    if config["record_video"]:
+        # somehow the mask ppo does not work trigger properly. the step appears to count only to the batch size and then
+        # start again at step 0
+        # therefore here is a workaround
+        log.info(f"setting up video recorder")
 
-    video_folder = PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}")
+        _, n_jobs, n_machines = jsp_instance.shape
+        episode_len = n_jobs * n_machines
 
-    venv = VecVideoRecorder(
-        venv=venv,
-        video_folder=video_folder,
-        record_video_trigger=lambda x: x == 0,
-        video_length=episode_len,
-        name_prefix=f"{run.name}_{run.id}")
+        video_folder = PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}")
 
-    obs = venv.reset()
-    infos = None
-    for _ in track(range(episode_len), description="recording frames ..."):
-        masks = np.array([env.action_masks() for env in model.env.envs])
-        action, _ = model.predict(observation=obs, deterministic=False, action_masks=masks)
-        obs, _, _, infos = venv.step(action)
+        venv = VecVideoRecorder(
+            venv=venv,
+            video_folder=video_folder,
+            record_video_trigger=lambda x: x == 0,
+            video_length=episode_len,
+            name_prefix=f"{run.name}_{run.id}")
 
-    for i in range(venv.num_envs):
-        wb.log({
-            f'video_gantt_df_of_env_{i}': infos[i]["gantt_df"]
-        })
-    # Save the video
-    log.info("saving video...")
-    venv.close()
+        obs = venv.reset()
+        infos = None
+        for _ in track(range(episode_len), description="recording frames ..."):
+            masks = np.array([env.action_masks() for env in model.env.envs])
+            action, _ = model.predict(observation=obs, deterministic=False, action_masks=masks)
+            obs, _, _, infos = venv.step(action)
 
-    # video is saved automatically, if monitor_gym=True (see wb.init above)
-    # video_file = next(video_folder.glob('*.mp4'))
-    # wb_video = wb.Video(data_or_path=str(video_file))
-    # wb.log({"video": wb_video})
-    run.finish()
+        for i in range(venv.num_envs):
+            wb.log({
+                f'video_gantt_df_of_env_{i}': infos[i]["gantt_df"]
+            })
+        # Save the video
+        log.info("saving video...")
+        venv.close()
+
+        # video is saved automatically, if monitor_gym=True (see wb.init above)
+        # video_file = next(video_folder.glob('*.mp4'))
+        # wb_video = wb.Video(data_or_path=str(video_file))
+        # wb.log({"video": wb_video})
+
+    # run.finish()
+    log.info("done.")
     del venv

@@ -23,8 +23,8 @@ class Memory:
 class IcmMemory:
 
     def __len__(self):
-        assert len(self.prev_obs_memory) == len(self.obs_memory)
-        assert len(self.obs_memory) == len(self.action_memory)
+        # assert len(self.prev_obs_memory) == len(self.obs_memory)
+        # assert len(self.obs_memory) == len(self.action_memory)
         return len(self.prev_obs_memory)
 
     def __init__(self, capacity, obs_shape, action_shape):
@@ -34,14 +34,20 @@ class IcmMemory:
         self.obs_memory = Memory(capacity=self._capacity, elem_shape=obs_shape)
         self.action_memory = Memory(capacity=self._capacity, elem_shape=action_shape)
 
-        self._size = 0
+        # self._size = 0
 
-    def add(self, prev_obs, obs, action):
+    def add_single_entry(self, prev_obs, obs, action):
         self.prev_obs_memory.add(prev_obs)
         self.obs_memory.add(obs)
         self.action_memory.add(action)
+        # self._size += 1
 
-        self._size += 1
+    def add_multiple_entries(self, prev_obs: np.ndarray, obs: np.ndarray, actions: np.ndarray) -> None:
+        assert len(prev_obs) == len(obs)
+        assert len(obs) == len(actions)
+        for po, o, a in zip(prev_obs, obs, actions):
+            a = np.array(a)
+            self.add_single_entry(po, o, a)
 
     def sample(self, shuffle: bool = True, batch_size=None):
         if not batch_size:

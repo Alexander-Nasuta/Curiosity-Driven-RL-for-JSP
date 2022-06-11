@@ -31,5 +31,5 @@ if __name__ == '__main__':
 
     log.info("the JSP is completely scheduled.")
     log.info("press any key to close the window (while the window is focused).")
-    #env.render(wait=None)  # wait for keyboard input before closing the render window
+    env.render(wait=None)  # wait for keyboard input before closing the render window
     env.render(wait=5)

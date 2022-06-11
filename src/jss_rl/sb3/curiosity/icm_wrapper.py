@@ -1,5 +1,3 @@
-import itertools
-import sys
 import gym
 
 import torch
@@ -10,30 +8,13 @@ from typing import List, Dict
 import numpy as np
 import torch.nn as nn
 
+from copy import copy
 from stable_baselines3.common.vec_env import VecEnvWrapper
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn
 from torch.nn.functional import one_hot
 
-from jss_rl.sb3.util.memory import Memory, IcmMemory
-
-
-def build_dense_sequential_network(input_dim: int, output_dim: int, layers: List[int] = None, activation_function=None):
-    if layers is None:
-        layers = []
-    if activation_function is None:
-        activation_function = nn.Tanh()
-    # all dims
-    dims = np.array([input_dim, *layers, output_dim])
-    # in out pairs
-    l_in_out = [torch.nn.Linear(in_dim, out_dim) for in_dim, out_dim in zip(dims, dims[1:])]
-    # linear, act function pairs
-    l_in_out = zip(
-        l_in_out,
-        [activation_function] * len(l_in_out)
-    )
-    # flatten (list of tupels -> list)
-    l_in_out = itertools.chain.from_iterable(l_in_out)
-    return nn.Sequential(*l_in_out)
+from jss_rl.sb3.curiosity.icm_memory import IcmMemory
+from jss_rl.sb3.util.torch_dense_sequential_model_builder import build_dense_sequential_network
 
 
 class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
@@ -42,7 +23,7 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
                  venv: VecEnvWrapper,
 
                  beta: float = 0.2,
-                 eta: float = 10.0,
+                 eta: float = 1.0,
                  lr: float = 1e-3,
 
                  device: str = 'cpu',
@@ -60,11 +41,15 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
                  memory_capacity: int = 10_000,
                  shuffle_memory_samples: bool = True,
                  clear_memory_on_reset=False,
+
+                 exploration_steps: int = None
                  ):
         VecEnvWrapper.__init__(self, venv=venv)
 
         if not isinstance(venv.action_space, gym.spaces.Discrete):
             raise NotImplementedError
+
+        self.exploration_steps = exploration_steps
 
         if feature_net_hiddens is None:
             feature_net_hiddens = [64, 64]
@@ -106,7 +91,10 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         # ᵖʳᵉᵈ means predicted or 'hat' in paper notation
 
         # s
-        self._observation_dim = reduce((lambda x, y: x * y), venv.observation_space.shape)
+
+        # self.venv.observation_space.shape does not return the correct shape on some environments (i.e. frozenlake)
+        # self._observation_dim = reduce((lambda x, y: x * y), o_shape)
+        self._observation_dim = len(self.venv.reset()[0].ravel())
 
         # s ⟼ Φ
         self._curiosity_feature_net = build_dense_sequential_network(
@@ -143,11 +131,13 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         self._optimizer = torch.optim.Adam(forward_params + inverse_params + feature_params, lr=self.lr)
 
-        # for intrisic return info
-        self._intrinsic_rewards = [[]] * venv.num_envs  # empty list for every env
+        # for intrinsic return info
+        self._intrinsic_rewards = [np.array([]) for _ in range(self.venv.num_envs)]
+        # for extrinsic return info
+        self._extrinsic_rewards = [np.array([]) for _ in range(self.venv.num_envs)]
 
     def step_async(self, actions: np.ndarray) -> None:
-        self._num_timesteps += 1
+        self._num_timesteps += self.venv.num_envs  # one step per env
         self.actions = actions
         self.venv.step_async(actions)
 
@@ -155,33 +145,61 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         """Overrides VecEnvWrapper.step_wait."""
         observations, rewards, dones, infos = self.venv.step_wait()
 
-        # print(f"before: {rewards}")
         intrinsic_rewards = np.zeros(self.venv.num_envs)
+
+        if self.exploration_steps is not None and self._num_timesteps > self.exploration_steps:
+            for i, done in enumerate(dones):
+                self._extrinsic_rewards[i] = np.append(self._extrinsic_rewards[i], [rewards[i]])
+                self._intrinsic_rewards[i] = np.append(self._intrinsic_rewards[i], [intrinsic_rewards[i]])
+                infos[i]["extrinsic_reward"] = rewards[i]
+                infos[i]['intrinsic_reward'] = intrinsic_rewards[i]
+                if done:
+                    infos[i]["extrinsic_return"] = self._extrinsic_rewards[i].sum()
+                    infos[i]['intrinsic_return'] = self._intrinsic_rewards[i].sum()
+                    infos[i]['total_return'] = infos[i]["extrinsic_return"] + infos[i]['intrinsic_return']
+                    self._extrinsic_rewards[i] = np.array([])
+                    self._intrinsic_rewards[i] = np.array([])
+            return observations, rewards, dones, infos
+
         if self.prev_observations is not None and self.actions is not None:
             # iterate over envs in venv
-            for i, (prev_o, a, o) in enumerate(zip(self.prev_observations, self.actions, observations)):
-                a = np.array(a)
-                self.icm_memory.add(prev_obs=prev_o, action=a, obs=o)
-                i_rew = self._calc_intrinsic_reward(obs=prev_o, actions=a, next_obs=o)
-                intrinsic_rewards[i] = i_rew
-                infos[i]['intrinsic_reward'] = i_rew
-                self._intrinsic_rewards[i].append(i_rew)
-                rewards[i] += i_rew
+            intrinsic_rewards = self._calc_intrinsic_reward(
+                obs=self.prev_observations,
+                actions=self.actions,
+                next_obs=observations
+            )
+            # add prev_obs, action, obs tuples to memory (one tuple for each env in the venv)
+            self.icm_memory.add_multiple_entries(
+                prev_obs=self.prev_observations,
+                actions=self.actions,
+                obs=observations
+            )
 
         for i, done in enumerate(dones):
-            if not done:
-                continue
-            infos[i]['intrinsic_return'] = np.sum(np.array(self._intrinsic_rewards[i]))
-            if "extrinsic_return" in infos[i].keys():
-                infos[i]['total_return'] = infos[i]['intrinsic_return'] + infos[i]['extrinsic_return']
-            self._intrinsic_rewards[i] = []
+            self._extrinsic_rewards[i] = np.append(self._extrinsic_rewards[i], [rewards[i]])
+            self._intrinsic_rewards[i] = np.append(self._intrinsic_rewards[i], [intrinsic_rewards[i]])
+
+            infos[i]["extrinsic_reward"] = rewards[i]
+            infos[i]['intrinsic_reward'] = intrinsic_rewards[i]
+
+            if done:
+                infos[i]["extrinsic_return"] = self._extrinsic_rewards[i].sum()
+                infos[i]['intrinsic_return'] = self._intrinsic_rewards[i].sum()
+                infos[i]['total_return'] = infos[i]["extrinsic_return"] + infos[i]['intrinsic_return']
+
+                self._extrinsic_rewards[i] = np.array([])
+                self._intrinsic_rewards[i] = np.array([])
+
+        augmented_reward = rewards + intrinsic_rewards
 
         if self._num_timesteps % self.postprocess_every_n_steps == 0:
             post_proc_info = self.postprocess_trajectory()
             for i, old_infos in enumerate(infos):
                 infos[i] = {**old_infos, **post_proc_info}
 
-        return observations, rewards, dones, infos
+        # override previous observations
+        self.prev_observations = observations
+        return observations, augmented_reward, dones, infos
 
     def _calc_intrinsic_reward(self, obs: np.ndarray, actions: np.ndarray, next_obs: np.ndarray):
         with torch.no_grad():
@@ -190,6 +208,10 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
             # sₜ₊₁ ≙ next_obs
 
             # sₜ ⟼ Φ(sₜ)
+            if self._observation_dim == 1:
+                obs = np.array([np_array.ravel() for np_array in obs])
+                next_obs = np.array([np_array.ravel() for np_array in next_obs])
+
             phi = self._curiosity_feature_net(
                 torch.from_numpy(obs.astype(np.float32))
             )
@@ -245,6 +267,10 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         # Push both observations through feature net to get both phis.
         # sₜ ≙ obs
         # sₜ₊₁ ≙ next_obs
+
+        if self._observation_dim == 1:
+            prev_obs = np.array([np_array.ravel() for np_array in prev_obs])
+            obs = np.array([np_array.ravel() for np_array in obs])
 
         # sₜ ⟼ Φ(sₜ)
         phi = self._curiosity_feature_net(
@@ -334,8 +360,9 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.prev_observations = observations
         self.actions = None
 
-        # reset intrinsic reward tracker
-        self._intrinsic_rewards = [[]] * self.venv.num_envs
+        # reset trackers
+        self._intrinsic_rewards = [np.array([]) for _ in range(self.venv.num_envs)]
+        self._extrinsic_rewards = [np.array([]) for _ in range(self.venv.num_envs)]
 
         if self.clear_memory_on_reset:
             self.icm_memory = IcmMemory(
@@ -348,40 +375,40 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
 
 if __name__ == '__main__':
-    from stable_baselines3.common.env_util import make_vec_env
+    from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
     from stable_baselines3.common.evaluation import evaluate_policy
+    from stable_baselines3.common.vec_env import VecMonitor
     from stable_baselines3 import A2C
-
-    import copy
 
     env_id = "CartPole-v1"
 
-    cartpole_venv = make_vec_env(
+    venv = make_vec_env_without_monitor(
         env_id=env_id,
         env_kwargs={},
-        n_envs=4
+        n_envs=1
     )
 
-    budget = 5_000
+    budget = 10_000
     eval_episodes = 10
 
-    icm_venv = IntrinsicCuriosityModuleWrapper(venv=cartpole_venv)
-    _, r, _, info = icm_venv.step(np.array([1] * 4))
-    print(r)
+    cartpole_venv = VecMonitor(venv=venv)
 
-    model1 = A2C('MlpPolicy', cartpole_venv, verbose=0)
-    model2 = copy.deepcopy(model1)
+    model1 = A2C('MlpPolicy', cartpole_venv, verbose=0, seed=9001)
+
     model1.learn(total_timesteps=budget)
-
-    mean_reward, std_reward = evaluate_policy(model1, icm_venv, n_eval_episodes=eval_episodes)
-
+    mean_reward, std_reward = evaluate_policy(model1, cartpole_venv, n_eval_episodes=eval_episodes)
     print(f"without icm: {mean_reward=}, {std_reward=}")
-    sys.exit(1)
 
     cartpole_venv.reset()
-    cartpole_venv = IntrinsicCuriosityModuleWrapper(venv=cartpole_venv)
+    cartpole_icm_venv = IntrinsicCuriosityModuleWrapper(
+        venv=venv,
+        eta=0.15,
+        exploration_steps=5_000
+    )
+    cartpole_icm_venv = VecMonitor(venv=cartpole_icm_venv)
 
-    model2.set_env(cartpole_venv)
+    model2 = A2C('MlpPolicy', cartpole_icm_venv, verbose=0, seed=9001)
+    # model2.set_env(cartpole_venv)
     model2.learn(total_timesteps=budget)
 
     mean_reward, std_reward = evaluate_policy(model2, model2.get_env(), n_eval_episodes=eval_episodes)

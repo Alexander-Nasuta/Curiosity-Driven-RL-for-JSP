@@ -389,11 +389,9 @@ class DisjunctiveGraphJssEnv(gym.Env):
 
             info["makespan"] = makespan
             info["gantt_df"] = self.network_as_dataframe()
-            info["extrinsic_return"] = reward
             if self.verbose > 0:
                 log.info(f"makespan: {makespan}, return: {reward:.2f}")
 
-        info["extrinsic_reward"] = reward
         info["scaling_divisor"] = self.scaling_divisor
 
         state = self._state_array()
