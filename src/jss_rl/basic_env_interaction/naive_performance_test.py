@@ -8,7 +8,7 @@ from jss_utils.jss_logger import log
 
 if __name__ == '__main__':
 
-    env = env_utils.get_pre_configured_example_env()
+    env = env_utils.get_pre_configured_example_env(name="ta01")
 
     done = False
     score = 0

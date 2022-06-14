@@ -7,8 +7,12 @@ class ProgressBarCallback(BaseCallback):
     """
 
     def _on_step(self) -> bool:
-        if self.num_timesteps % 5040 == 0: # 5040 has a lot of divisors, time step goes up by num envs
-            self.progress.update(self.task, completed=self.num_timesteps)
+        if self.num_timesteps % 60 == 0:  # 60 has a lot of divisors, time step goes up by num envs
+            self.progress.update(
+                self.task,
+                completed=self.num_timesteps,
+                description=f"[blue] [{self.num_timesteps:,} / {self.total_steps:,}]"
+            )
         return True
 
     def __init__(self, progress, task, total_steps):

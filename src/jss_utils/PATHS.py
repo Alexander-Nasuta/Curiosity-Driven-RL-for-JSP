@@ -9,6 +9,8 @@ SRC_PATH = JSS_UTILS_PATH.parent
 
 PROJECT_ROOT_PATH = SRC_PATH.parent
 
+WANDB_API_KEY_FILE_PATH = PROJECT_ROOT_PATH.joinpath("wandb_api_key_file")
+
 RESOURCES_ROOT_PATH = PROJECT_ROOT_PATH.joinpath("resources")
 
 JSP_INSTANCES_PATH = RESOURCES_ROOT_PATH.joinpath("jsp_instances")

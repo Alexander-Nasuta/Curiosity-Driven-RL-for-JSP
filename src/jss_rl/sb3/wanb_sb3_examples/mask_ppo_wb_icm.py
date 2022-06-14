@@ -43,7 +43,7 @@ gym.envs.register(
 )
 
 config = {
-    "total_timesteps": 500_000,
+    "total_timesteps": 3_000_000,
     "n_envs": 9,  # multiprocessing.cpu_count()-1
 
     "instance_name": BENCHMARK_INSTANCE_NAME,
@@ -64,8 +64,8 @@ config = {
         # "target_kl": 0.05047, # for early stopping
         "policy_kwargs": {
             "net_arch": [{
-                "pi": [64, 64],
-                "vf": [64, 64],
+                "pi": [128, 128, 128],
+                "vf": [128, 128, 128],
             }],
             "ortho_init": True,
             "activation_fn": th.nn.Tanh,  # th.nn.ReLU
@@ -81,6 +81,7 @@ config = {
         "normalize_observation_space": True,
         "flat_observation_space": True,
         "perform_left_shift_if_possible": True,
+        "action_mode": 'task',
         "dtype": "float32",
         "verbose": 0,
         "default_visualisations": [
@@ -91,23 +92,23 @@ config = {
 
     "icm_wrapper_kwargs": {
         "beta": 0.2,
-        "eta": 0.005,
+        "eta": 0.075,
         "lr": 1e-3,
         "device": 'cpu',
         "feature_dim": 288,
-        "feature_net_hiddens": [64, 64],
-        "feature_net_activation": th.nn.Tanh(),
-        "inverse_feature_net_hiddens": [64, 64],
-        "inverse_feature_net_activation": th.nn.Tanh(),
-        "forward_fcnet_net_hiddens": [64, 64],
-        "forward_fcnet_net_activation": th.nn.Tanh(),
-        "postprocess_every_n_steps": 100,
-        "postprocess_sample_size": 100,
-        "memory_capacity": 1_000,
+        "feature_net_hiddens": [128, 128],
+        "feature_net_activation": th.nn.ReLU(),
+        "inverse_feature_net_hiddens": [128, 128],
+        "inverse_feature_net_activation": th.nn.ReLU(),
+        "forward_fcnet_net_hiddens": [128, 128],
+        "forward_fcnet_net_activation": th.nn.ReLU(),
+        "postprocess_every_n_steps": 10,
+        "postprocess_sample_size": 10,
+        "memory_capacity": 900,
         "shuffle_memory_samples": True,
         "clear_memory_on_reset": False,
 
-        "exploration_steps": 300_000
+        "exploration_steps": 300000
     },
 
     "EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs": {

@@ -242,7 +242,7 @@ class DisjunctiveGraphJssEnv(gym.Env):
                     dtype=self.dtype)
             })
         else:
-            raise NotImplementedError("")
+            raise NotImplementedError(f"'{self.env_transform}' is not supported.")
 
         if self.scale_reward and scaling_divisor:
             self.scaling_divisor = scaling_divisor
@@ -876,7 +876,10 @@ class DisjunctiveGraphJssEnv(gym.Env):
                 mask[task_id - 1] = True
 
             if True not in mask:
-                raise RuntimeError("something went wrong")
+                if self.verbose >= 1:
+                    log.warning(f"no action options remaining")
+                if not self.env_transform == 'mask':
+                    raise RuntimeError("something went wrong")  # todo: remove error?
             return mask
         elif action_mode == 'job':
             task_mask = self.valid_action_mask(action_mode='task')

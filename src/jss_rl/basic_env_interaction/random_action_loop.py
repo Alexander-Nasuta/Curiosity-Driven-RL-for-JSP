@@ -27,7 +27,7 @@ if __name__ == '__main__':
         scale_reward=True,
         normalize_observation_space=True,
         flat_observation_space=True,
-        action_mode='task',  # alternatve 'job'
+        action_mode='task',  # alternative 'job'
         dtype='float32'
     )
 

@@ -92,7 +92,8 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         # s
 
-        # self.venv.observation_space.shape does not return the correct shape on some environments (i.e. frozenlake)
+        # self.venv.observation_space.shape does return weird shapes on some environments
+        # (i.e. frozenlake -> () for a scalar value)
         # self._observation_dim = reduce((lambda x, y: x * y), o_shape)
         self._observation_dim = len(self.venv.reset()[0].ravel())
 
@@ -343,11 +344,11 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         # optimizer step
         #
+        # zero grad before new step
+        self._optimizer.zero_grad()
         # Backward pass and update
         loss.backward()
         self._optimizer.step()
-        # zero grad before new step
-        self._optimizer.zero_grad()
 
         return {
             "icm_loss": loss.item()
@@ -393,7 +394,7 @@ if __name__ == '__main__':
 
     cartpole_venv = VecMonitor(venv=venv)
 
-    model1 = A2C('MlpPolicy', cartpole_venv, verbose=0, seed=9001)
+    model1 = A2C('MlpPolicy', cartpole_venv, verbose=0, seed=773)
 
     model1.learn(total_timesteps=budget)
     mean_reward, std_reward = evaluate_policy(model1, cartpole_venv, n_eval_episodes=eval_episodes)
@@ -407,7 +408,7 @@ if __name__ == '__main__':
     )
     cartpole_icm_venv = VecMonitor(venv=cartpole_icm_venv)
 
-    model2 = A2C('MlpPolicy', cartpole_icm_venv, verbose=0, seed=9001)
+    model2 = A2C('MlpPolicy', cartpole_icm_venv, verbose=0, seed=773)
     # model2.set_env(cartpole_venv)
     model2.learn(total_timesteps=budget)
 

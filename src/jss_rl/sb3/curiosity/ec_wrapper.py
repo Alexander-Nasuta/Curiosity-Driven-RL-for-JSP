@@ -53,7 +53,7 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
         if comparator_net_hiddens is None:
             comparator_net_hiddens = [64, 64]
 
-        # self._observation_dim = reduce((lambda x, y: x * y), venv.observation_space.shape)
+        #self._observation_dim = reduce((lambda x, y: x * y), venv.observation_space.shape)
         self._observation_dim = len(self.venv.reset()[0].ravel())
 
         # The module consists of both parametric and non-parametric components.
@@ -188,18 +188,11 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
         # compare current observations with the ones in memory
         reward_bonus = np.zeros(self.venv.num_envs)
         with torch.no_grad():
-            print("asd")
-            print(observations.shape)
-            if self._observation_dim == 1:
-                observations = np.array([np_array.ravel() for np_array in observations])
-            print("asd2")
-            print(observations.shape)
 
             embedded_obs = self.embedding_net(
                 torch.from_numpy(observations.astype(np.float32))
             ).cpu().detach().numpy()
 
-            print("asd3")
             if self.ec_memory.is_not_empty():
                 memory_entries = self.ec_memory.get_all_entries()
                 for env_i, (embedded_observation, memory_entries_of_sub_env) in enumerate(
@@ -236,16 +229,7 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
 
         for i, done in enumerate(dones):
             # append observations to trajectories
-            print("asd4")
-            print(self.trajectories[i].shape)
-            print(observations[i].shape)
-
-            if self._observation_dim == 1:
-                self.trajectories[i] = np.append(self.trajectories[i], observations[i], axis=0)
-            else:
-                self.trajectories[i] = np.append(self.trajectories[i], [observations[i]], axis=0)
-            print("asd5")
-            print(self.trajectories[i].shape)
+            self.trajectories[i] = np.append(self.trajectories[i], [observations[i]], axis=0)
 
             self._extrinsic_rewards[i] = np.append(self._extrinsic_rewards[i], [rewards[i]])
             self._bonus_rewards[i] = np.append(self._bonus_rewards[i], [reward_bonus[i]])
@@ -278,7 +262,6 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
         return observations
 
     def _postprocess_trajectory(self, env_i: int) -> Dict:
-        print("post")
         trajectory = self.trajectories[env_i]
         training_data = np.empty(shape=(0, 3))
 
@@ -288,7 +271,7 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
         # positive examples (close distance)
         for k in range(1, self.train_action_distance_threshold + 1):
             obs_paris_of_distance_k = np.array([
-                # 0 = label
+                # 1 = label
                 [obs1, obs2, 1] for obs1, obs2 in zip(trajectory, trajectory[k:])
             ], dtype=object)
             training_data = np.append(training_data, obs_paris_of_distance_k, axis=0)
@@ -306,15 +289,12 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
         # shuffle training data
         np.random.shuffle(training_data)  # shuffles first dim only
 
+        # use vstack to convert dtype object to float
         x1 = np.vstack(training_data[:, 0]).astype(np.float32)
         x2 = np.vstack(training_data[:, 1]).astype(np.float32)
         y = torch.from_numpy(
             np.vstack(training_data[:, 2]).astype(np.float32)
         )
-
-        if self._observation_dim == 1:
-            x1 = np.array([np_array.ravel() for np_array in x1])
-            x2 = np.array([np_array.ravel() for np_array in x2])
 
         # perform embedding of first observation
         x1 = self.embedding_net(
@@ -341,8 +321,6 @@ class EpisodicCuriosityEnvWrapper(VecEnvWrapper):
         self._optimizer.step()
         # zero grad before new step
         self._optimizer.zero_grad()
-
-        print(f"loss : {loss.item()}")
 
         return {
             "ec_loss": loss.item()

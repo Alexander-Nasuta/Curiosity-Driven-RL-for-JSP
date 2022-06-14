@@ -53,11 +53,11 @@ class EpisodicMemory:
                 capacity=self._capacity,
                 elem_shape=self._obs_shape,
                 replacement_strategy=self._replacement_strategy
-            ) for _ in range(self._n_envs)
-        ]
+            ) for _ in range(self._n_envs)]
 
     def add_all(self, observations: np.ndarray) -> None:
         n_envs, *_ = observations.shape
+        print(observations.shape)
         assert n_envs == self._n_envs
         for i, obs in enumerate(observations):
             self.ec_sub_memory[i].add(obs)
@@ -80,5 +80,4 @@ class EpisodicMemory:
             capacity=self._capacity,
             elem_shape=self._obs_shape,
             replacement_strategy=self._replacement_strategy
-        ) for _ in range(self._n_envs)
-        ]
+        ) for _ in range(self._n_envs)]
