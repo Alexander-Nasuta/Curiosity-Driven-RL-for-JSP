@@ -1,4 +1,4 @@
-from typing import List, Union
+import sys
 
 import gym
 import numpy as np
@@ -6,6 +6,9 @@ import networkx as nx
 import pandas as pd
 
 import matplotlib.pyplot as plt
+
+from collections import OrderedDict
+from typing import List, Union
 
 from jss_graph_env.disjunctive_graph_jss_visualizer import DisjunctiveGraphJspVisualizer
 from jss_utils.jss_logger import log
@@ -63,6 +66,7 @@ class DisjunctiveGraphJssEnv(gym.Env):
                  dtype: str = "float32",
                  # parameters for actions
                  action_mode: str = "task",
+                 env_transform: str = None,
                  perform_left_shift_if_possible: bool = True,
                  # parameters for rendering
                  c_map: str = "rainbow",
@@ -162,6 +166,10 @@ class DisjunctiveGraphJssEnv(gym.Env):
             raise ValueError(f"only 'task' and 'job' are valid arguments for 'action_mode'. {action_mode} is not.")
         self.action_mode = action_mode
 
+        if env_transform not in [None, 'mask']:
+            raise ValueError(f"only `None` and 'mask' are valid arguments for 'action_mode'. {action_mode} is not.")
+        self.env_transform = env_transform
+
         # rendering settings
         self.c_map = c_map
         if default_visualisations is None:
@@ -217,12 +225,24 @@ class DisjunctiveGraphJssEnv(gym.Env):
             a, b = self.observation_space_shape
             self.observation_space_shape = (a * b,)
 
-        self.observation_space = gym.spaces.Box(
-            low=0.0,
-            high=1.0 if self.normalize_observation_space else jsp_instance.max(),
-            shape=self.observation_space_shape,
-            dtype=self.dtype
-        )
+        if self.env_transform is None:
+            self.observation_space = gym.spaces.Box(
+                low=0.0,
+                high=1.0 if self.normalize_observation_space else jsp_instance.max(),
+                shape=self.observation_space_shape,
+                dtype=self.dtype
+            )
+        elif self.env_transform == 'mask':
+            self.observation_space = gym.spaces.Dict({
+                "action_mask": gym.spaces.Box(0, 1, shape=(self.action_space.n,), dtype=np.int32),
+                "observations": gym.spaces.Box(
+                    low=0.0,
+                    high=1.0 if self.normalize_observation_space else jsp_instance.max(),
+                    shape=self.observation_space_shape,
+                    dtype=self.dtype)
+            })
+        else:
+            raise NotImplementedError("")
 
         if self.scale_reward and scaling_divisor:
             self.scaling_divisor = scaling_divisor
@@ -800,6 +820,12 @@ class DisjunctiveGraphJssEnv(gym.Env):
             # falter observation
             res = np.ravel(res).astype(self.dtype)
 
+        if self.env_transform == 'mask':
+            res = OrderedDict({
+                "action_mask": np.array(self.valid_action_mask()).astype(np.int32),
+                "observations": res
+            })
+
         return res
 
     def network_as_dataframe(self) -> pd.DataFrame:
@@ -868,28 +894,31 @@ if __name__ == '__main__':
             for flat in [True, False]:
                 for scale_rew in [True, False]:
                     for mode in ["job", "task"]:
-                        for dt in ["float16", "float32", "float64"]:
-                            jsp = np.array([
-                                [
-                                    [1, 2, 0],  # job 0
-                                    [0, 2, 1]  # job 1
-                                ],
-                                [
-                                    [17, 12, 19],  # task durations of job 0
-                                    [8, 6, 2]  # task durations of job 1
-                                ]
+                        for env_transform in [None, 'mask']:
+                            for dt in ["float16", "float32", "float64"]:
+                                jsp = np.array([
+                                    [
+                                        [1, 2, 0],  # job 0
+                                        [0, 2, 1]  # job 1
+                                    ],
+                                    [
+                                        [17, 12, 19],  # task durations of job 0
+                                        [8, 6, 2]  # task durations of job 1
+                                    ]
 
-                            ])
+                                ])
 
-                            env = DisjunctiveGraphJssEnv(
-                                jps_instance=jsp,
-                                perform_left_shift_if_possible=left_shift,
-                                scaling_divisor=None,
-                                scale_reward=scale_rew,
-                                normalize_observation_space=normalize,
-                                flat_observation_space=flat,
-                                action_mode=mode,
-                                dtype=dt
-                            )
+                                env = DisjunctiveGraphJssEnv(
+                                    jps_instance=jsp,
+                                    perform_left_shift_if_possible=left_shift,
+                                    scaling_divisor=None,
+                                    scale_reward=scale_rew,
+                                    normalize_observation_space=normalize,
+                                    flat_observation_space=flat,
+                                    action_mode=mode,
+                                    dtype=dt,
+                                    env_transform=env_transform,
+                                    verbose=1
+                                )
 
-                            check_env(env)
+                                check_env(env)
