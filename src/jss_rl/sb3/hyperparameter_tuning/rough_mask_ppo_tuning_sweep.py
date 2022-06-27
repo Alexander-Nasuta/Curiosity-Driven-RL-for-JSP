@@ -14,7 +14,7 @@ from wandb.integration.sb3 import WandbCallback
 import jss_utils.PATHS as PATHS
 import jss_utils.jsp_instance_parser as parser
 import jss_utils.jsp_instance_details as details
-from jss_rl.sb3.util.episode_end_moving_average_rollout_end_logger_callback import \
+from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 
 from jss_utils.jss_logger import log

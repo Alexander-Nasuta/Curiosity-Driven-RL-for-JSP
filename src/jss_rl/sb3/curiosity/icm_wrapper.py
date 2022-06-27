@@ -1,16 +1,18 @@
+import sys
+
 import gym
 
 import torch
 
 from functools import reduce
-from typing import List, Dict
+from typing import List, Dict, Union
 
 import numpy as np
 import torch.nn as nn
 
 from copy import copy
-from stable_baselines3.common.vec_env import VecEnvWrapper
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn
+from stable_baselines3.common.vec_env import VecEnvWrapper, DummyVecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnv
 from torch.nn.functional import one_hot
 
 from jss_rl.sb3.curiosity.icm_memory import IcmMemory
@@ -20,7 +22,7 @@ from jss_rl.sb3.util.torch_dense_sequential_model_builder import build_dense_seq
 class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
     def __init__(self,
-                 venv: VecEnvWrapper,
+                 venv: Union[VecEnvWrapper, VecEnv, DummyVecEnv],
 
                  beta: float = 0.2,
                  eta: float = 1.0,
@@ -30,11 +32,11 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
                  feature_dim: int = 288,
                  feature_net_hiddens: List[int] = None,
-                 feature_net_activation=nn.Tanh(),
+                 feature_net_activation=nn.ReLU(),
                  inverse_feature_net_hiddens: List[int] = None,
-                 inverse_feature_net_activation=nn.Tanh(),
+                 inverse_feature_net_activation=nn.ReLU(),
                  forward_fcnet_net_hiddens: List[int] = None,
-                 forward_fcnet_net_activation=nn.Tanh(),
+                 forward_fcnet_net_activation=nn.ReLU(),
 
                  postprocess_every_n_steps: int = 100,
                  postprocess_sample_size: int = 100,
@@ -91,11 +93,16 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         # ᵖʳᵉᵈ means predicted or 'hat' in paper notation
 
         # s
+        if isinstance(self.venv.observation_space, gym.spaces.Box):
+            o_shape = self.venv.observation_space.shape
+            self._observation_dim = reduce((lambda x, y: x * y), o_shape)
 
-        # self.venv.observation_space.shape does return weird shapes on some environments
-        # (i.e. frozenlake -> () for a scalar value)
-        # self._observation_dim = reduce((lambda x, y: x * y), o_shape)
-        self._observation_dim = len(self.venv.reset()[0].ravel())
+        elif isinstance(self.venv.observation_space, gym.spaces.Discrete):
+            self._observation_dim = self.venv.observation_space.n  # perform one hot encoding on observations
+
+        else:
+            raise NotImplementedError(f"the icm wrapper does not support observation spaces of "
+                                      f"type `{type(self.venv.observation_space)}` so far.")
 
         # s ⟼ Φ
         self._curiosity_feature_net = build_dense_sequential_network(
@@ -146,8 +153,17 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         """Overrides VecEnvWrapper.step_wait."""
         observations, rewards, dones, infos = self.venv.step_wait()
 
+        original_obs = observations
+
+        if isinstance(self.venv.observation_space, gym.spaces.Discrete):
+            # perform one hot encoding
+            n_values = self.venv.observation_space.n
+            one_hot_enc = lambda obs: np.eye(n_values)[obs]
+            observations = one_hot_enc(observations)
+
         intrinsic_rewards = np.zeros(self.venv.num_envs)
 
+        # add info fields even if curiosity exploration expired
         if self.exploration_steps is not None and self._num_timesteps > self.exploration_steps:
             for i, done in enumerate(dones):
                 self._extrinsic_rewards[i] = np.append(self._extrinsic_rewards[i], [rewards[i]])
@@ -163,13 +179,12 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
             return observations, rewards, dones, infos
 
         if self.prev_observations is not None and self.actions is not None:
-            # iterate over envs in venv
             intrinsic_rewards = self._calc_intrinsic_reward(
                 obs=self.prev_observations,
                 actions=self.actions,
                 next_obs=observations
             )
-            # add prev_obs, action, obs tuples to memory (one tuple for each env in the venv)
+            # add (prev_obs, action, obs) tuples to memory (one tuple for each env in the venv)
             self.icm_memory.add_multiple_entries(
                 prev_obs=self.prev_observations,
                 actions=self.actions,
@@ -200,7 +215,8 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         # override previous observations
         self.prev_observations = observations
-        return observations, augmented_reward, dones, infos
+
+        return original_obs, augmented_reward, dones, infos
 
     def _calc_intrinsic_reward(self, obs: np.ndarray, actions: np.ndarray, next_obs: np.ndarray):
         with torch.no_grad():
@@ -268,10 +284,6 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         # Push both observations through feature net to get both phis.
         # sₜ ≙ obs
         # sₜ₊₁ ≙ next_obs
-
-        if self._observation_dim == 1:
-            prev_obs = np.array([np_array.ravel() for np_array in prev_obs])
-            obs = np.array([np_array.ravel() for np_array in obs])
 
         # sₜ ⟼ Φ(sₜ)
         phi = self._curiosity_feature_net(
@@ -376,42 +388,73 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
 
 if __name__ == '__main__':
+    from gym.wrappers import TimeLimit
     from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
     from stable_baselines3.common.evaluation import evaluate_policy
     from stable_baselines3.common.vec_env import VecMonitor
-    from stable_baselines3 import A2C
+    from stable_baselines3 import A2C, PPO
 
+    print("##### CartPole-v1 #####")
     env_id = "CartPole-v1"
-
     venv = make_vec_env_without_monitor(
         env_id=env_id,
         env_kwargs={},
         n_envs=1
     )
-
     budget = 10_000
     eval_episodes = 10
-
     cartpole_venv = VecMonitor(venv=venv)
-
     model1 = A2C('MlpPolicy', cartpole_venv, verbose=0, seed=773)
-
     model1.learn(total_timesteps=budget)
-    mean_reward, std_reward = evaluate_policy(model1, cartpole_venv, n_eval_episodes=eval_episodes)
-    print(f"without icm: {mean_reward=}, {std_reward=}")
-
+    # mean_reward, std_reward = evaluate_policy(model1, cartpole_venv, n_eval_episodes=eval_episodes)
+    # print(f"without icm: {mean_reward=}, {std_reward=}")
     cartpole_venv.reset()
     cartpole_icm_venv = IntrinsicCuriosityModuleWrapper(
         venv=venv,
         eta=0.15,
-        exploration_steps=5_000
+        exploration_steps=int(budget * 0.5)
     )
     cartpole_icm_venv = VecMonitor(venv=cartpole_icm_venv)
-
     model2 = A2C('MlpPolicy', cartpole_icm_venv, verbose=0, seed=773)
     # model2.set_env(cartpole_venv)
-    model2.learn(total_timesteps=budget)
-
+    #model2.learn(total_timesteps=budget)
     mean_reward, std_reward = evaluate_policy(model2, model2.get_env(), n_eval_episodes=eval_episodes)
-
     print(f"with icm: {mean_reward=}, {std_reward=}")
+
+    print("#### FrozenLake-v1 #####")
+
+    budget = 25_000
+
+    env_name = "FrozenLake-v1"
+    env_kwargs = {
+        "desc": [
+            "SFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFG",
+        ],
+        "is_slippery": False,
+    }
+
+    venv = make_vec_env_without_monitor(
+        env_id=env_name,
+        env_kwargs=env_kwargs,
+        wrapper_class=TimeLimit,
+        wrapper_kwargs={"max_episode_steps": 16},
+        n_envs=4
+    )
+
+    # no_icm_venv = VecMonitor(venv=venv)
+    # no_icm_model = PPO('MlpPolicy', no_icm_venv, verbose=0)
+    # no_icm_model.learn(total_timesteps=budget)
+
+    icm_venv = IntrinsicCuriosityModuleWrapper(
+        venv=venv,
+        inverse_feature_net_hiddens=[64],
+    )
+    icm_model = PPO('MlpPolicy', icm_venv, verbose=0)
+    icm_model.learn(total_timesteps=budget)

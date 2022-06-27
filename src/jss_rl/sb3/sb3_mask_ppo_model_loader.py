@@ -80,8 +80,8 @@ def solve_jsp(jsp_instance: np.ndarray, path: pl.Path, env_kwargs: dict, n_envs:
 
 
 if __name__ == '__main__':
-    run_name = "divine-totem-165"
-    run_id = "1nl7ebtr"
+    run_name = "divine-totem-165" # enter run name her
+    run_id = "1nl7ebtr"           # enter run id her
     model_path = PATHS.WANDB_PATH.joinpath(f"{run_name}_{run_id}").joinpath("model")
 
     jsp = parser.get_instance_by_name('ft06')

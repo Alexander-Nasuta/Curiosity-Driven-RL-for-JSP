@@ -17,7 +17,7 @@ from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor
 from wandb.integration.sb3 import WandbCallback
 
-from jss_rl.sb3.curiosity.icm_wrapper import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.ec_wrapper import EpisodicCuriosityEnvWrapper
 from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 from jss_rl.sb3.util.info_field_moving_avarege_logger_callback import InfoFieldMovingAverageLogger
@@ -90,31 +90,14 @@ config = {
         ]
     },
 
-    "icm_wrapper_kwargs": {
-        "beta": 0.2,
-        "eta": 0.075,
-        "lr": 1e-3,
-        "device": 'cpu',
-        "feature_dim": 288,
-        "feature_net_hiddens": [128, 128],
-        "feature_net_activation": th.nn.ReLU(),
-        "inverse_feature_net_hiddens": [128, 128],
-        "inverse_feature_net_activation": th.nn.ReLU(),
-        "forward_fcnet_net_hiddens": [128, 128],
-        "forward_fcnet_net_activation": th.nn.ReLU(),
-        "postprocess_every_n_steps": 10,
-        "postprocess_sample_size": 10,
-        "memory_capacity": 900,
-        "shuffle_memory_samples": True,
-        "clear_memory_on_reset": False,
+    "ec_wrapper_kwargs": {
 
-        "exploration_steps": 300000
     },
 
     "EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs": {
         "fields": [
             "extrinsic_return",
-            "intrinsic_return",
+            "bonus_return",
             "total_return",
             "makespan",
             "scaling_divisor",
@@ -123,9 +106,9 @@ config = {
     },
     "InofFieldMovingAvarageLogger_kwargs": {
         "fields": [
-            "intrinsic_reward",
+            "bonus_reward",
             "extrinsic_reward",
-            "icm_loss"
+            "ec_loss"
         ],
         "field_capacities": [
             100,
@@ -185,9 +168,9 @@ if __name__ == '__main__':
         n_envs=config["n_envs"]
     )
 
-    venv = IntrinsicCuriosityModuleWrapper(
+    venv = EpisodicCuriosityEnvWrapper(
         venv=blank_venv,
-        **config["icm_wrapper_kwargs"]
+        **config["ec_wrapper_kwargs"]
     )
 
     venv = VecMonitor(
@@ -230,7 +213,6 @@ if __name__ == '__main__':
             total_timesteps=config["total_timesteps"],
             callback=[wb_cb, episode_logger_cb, log_field_if_present_logger_cb, pb_cb]
         )
-
 
     if config["record_video"]:
         # somehow the mask ppo does not work trigger properly. the step appears to count only to the batch size and then

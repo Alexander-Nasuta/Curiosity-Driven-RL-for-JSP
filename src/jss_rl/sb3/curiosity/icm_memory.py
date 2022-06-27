@@ -1,15 +1,30 @@
+import random
+
 import numpy as np
 
 
 class Memory:
 
-    def __init__(self, capacity, elem_shape):
+    def __init__(self, capacity, elem_shape, replacement_strategy: str = "fifo"):
+        if replacement_strategy not in ["random", "fifo"]:
+            raise ValueError(f"replacement_strategy={replacement_strategy} is an invalid argument. "
+                             f"valid options are 'random' and 'fifo'")
+        self.replacement_strategy = replacement_strategy
         self._capacity = capacity
         self._memory = np.zeros(shape=(capacity, *elem_shape))
         self._size = 0
 
     def add(self, value):
-        index = self._size % self._capacity
+        _len = len(self)
+        if _len < self._capacity:
+            # fill memory if space is available
+            index = self._size
+        elif self.replacement_strategy == 'fifo':
+            index = self._size % self._capacity
+        else:
+            index = random.randint(0, _len - 1)  # both values are includes, therefore len -1
+
+        # print(f"strat: {self.replacement_strategy}, {index=}, len={len(self)}, size={self._size}")
         self._memory[index] = value
         self._size += 1
 

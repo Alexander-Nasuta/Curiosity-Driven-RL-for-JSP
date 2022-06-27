@@ -13,6 +13,8 @@ WANDB_API_KEY_FILE_PATH = PROJECT_ROOT_PATH.joinpath("wandb_api_key_file")
 
 RESOURCES_ROOT_PATH = PROJECT_ROOT_PATH.joinpath("resources")
 
+LOGS_FILE_PATH = RESOURCES_ROOT_PATH.joinpath("jss_logger.txt")
+
 JSP_INSTANCES_PATH = RESOURCES_ROOT_PATH.joinpath("jsp_instances")
 RL_OUTPUT_PATH = RESOURCES_ROOT_PATH.joinpath("rl_output")
 

@@ -13,7 +13,9 @@ class EpisodeEndMovingAverageRolloutEndLoggerCallback(BaseCallback):
         self.log_fields = fields
         self.capacity = capacity
         self.wandb_ref = wandb_ref
-        self.memory = {field: MovingAverage(capacity=self.capacity) for field in fields}
+        self.memory = {
+            field: MovingAverage(capacity=self.capacity) for field in fields
+        }
 
     def _on_step(self) -> bool:
         # env_infos of the envs inside the venv that are done with the episode
@@ -22,9 +24,13 @@ class EpisodeEndMovingAverageRolloutEndLoggerCallback(BaseCallback):
             for field in self.log_fields:
                 val = env_info[field]
                 self.memory[field].add(val)
+
         if self.wandb_ref and len(env_infos):
             for field in self.log_fields:
-                vals = [ev[field] for ev in self.locals['infos'] if field in ev.keys()]
+                vals = [
+                    ev[field] for ev in self.locals['infos']
+                    if field in ev.keys()
+                ]
                 if len(vals):
                     mean_val = mean(vals)
                     self.wandb_ref.log({
@@ -38,7 +44,7 @@ class EpisodeEndMovingAverageRolloutEndLoggerCallback(BaseCallback):
             self.logger.record(f"rollout/{field}", self.memory[field].mean())
             if self.wandb_ref:
                 self.wandb_ref.log({
-                    field: self.memory[field].mean(),
+                    f"rollout2/{field}": self.memory[field].mean(),
                     "num_timesteps": self.num_timesteps
                 })
 

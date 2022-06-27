@@ -36,6 +36,7 @@ class InfoFieldMovingAverageLogger(BaseCallback):
                     continue
                 val = env_info[field]
                 self.memory[field].add(val)
+
         if self.wandb_ref:
             for field in self.log_fields:
                 vals = [ev[field] for ev in self.locals['infos'] if field in ev.keys()]
@@ -52,7 +53,7 @@ class InfoFieldMovingAverageLogger(BaseCallback):
             self.logger.record(f"rollout/{field}", self.memory[field].mean())
             if self.wandb_ref:
                 self.wandb_ref.log({
-                    f"rollout/{field}": self.memory[field].mean(),
+                    f"rollout/{field}_mean": self.memory[field].mean(),
                     "num_timesteps": self.num_timesteps
                 })
         return True

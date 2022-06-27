@@ -1,15 +1,29 @@
 import pprint
+from typing import Optional, Tuple, Union
+from ray.rllib.models.tf.tf_action_dist import Categorical, MultiCategorical
+
 import gym
 import gym_minigrid
 
 import numpy as np
-
-
+from gym import Space
+from gym.spaces import Discrete, MultiDiscrete
 
 from ray import tune
+from ray.rllib import SampleBatch
+from ray.rllib.models import ModelV2, ModelCatalog, ActionDistribution
+from ray.rllib.models.torch.misc import SlimFC
+from ray.rllib.models.torch.torch_action_dist import TorchCategorical, TorchMultiCategorical
+from ray.rllib.models.utils import get_activation_fn
+from ray.rllib.utils import try_import_tf, try_import_torch, override, NullContextManager
+from ray.rllib.utils.exploration import Exploration
+from ray.rllib.utils.from_config import from_config
+from ray.rllib.utils.tf_utils import get_placeholder, one_hot as tf_one_hot
+from ray.rllib.utils.typing import ModelConfigDict, FromConfigSpec, TensorType
 from tabulate import tabulate
 from collections import deque
 
+from jss_rl.sb3.curiosity.curiosity_test.ray.icm2 import Curiosity3
 from jss_utils.jss_logger import log
 
 from ray.rllib.agents import DefaultCallbacks
@@ -157,12 +171,13 @@ def test_curiosity_on_frozen_lake():
     # Local only.
     config["num_workers"] = 0
     config["lr"] = 0.001
+    config["framework"] = "torch"
 
     no_icm_config = config.copy()
     trainer_without_icm = ppo.PPOTrainer(config=no_icm_config)
-
     config["exploration_config"] = {
-        "type": "Curiosity",  # <- Use the Curiosity module for exploring.
+        "type": Curiosity3,  # <- Use the Curiosity module for exploring.
+        "framework": "torch",
         "eta": 1.0,  # Weight for intrinsic rewards before being added to extrinsic ones.
         "lr": 0.001,  # Learning rate of the curiosity (ICM) module.
         "feature_dim": 288,  # Dimensionality of the generated feature vectors.
@@ -183,6 +198,7 @@ def test_curiosity_on_frozen_lake():
         }
     }
     icm_config = config.copy()
+    print(pprint.pformat(icm_config))
     trainer_with_icm = ppo.PPOTrainer(config=icm_config)
 
     headers = ['setup', 'reached goal', 'iterations']
@@ -207,7 +223,7 @@ def test_curiosity_on_frozen_lake():
 
     learnt = False
     log.info("evaluating performance without icm")
-    for i in range(num_iterations):
+    for i in range(0):
         result = trainer_without_icm.train()
         log.info(pprint.pformat(result))
         if result["episode_reward_max"] > 0.0:
@@ -242,7 +258,8 @@ def test_curiosity_on_partially_observable_domain():
     no_icm_config = config.copy()
 
     config["exploration_config"] = {
-        "type": "Curiosity",
+        "type": Curiosity3,
+        "framework": "torch",
         # For the feature NN, use a non-LSTM fcnet (same as the one
         # in the policy model).
         "eta": 0.1,
@@ -300,3 +317,4 @@ def test_curiosity_on_partially_observable_domain():
 
 if __name__ == '__main__':
     test_curiosity_on_frozen_lake()
+    #test_curiosity_on_partially_observable_domain()

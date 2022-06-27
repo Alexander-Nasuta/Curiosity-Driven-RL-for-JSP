@@ -3,6 +3,7 @@ import shutil
 
 from rich.logging import RichHandler
 
+import jss_utils.PATHS as PATHS
 from jss_utils.banner import big_banner, small_banner
 
 # print banner when logger is imported
@@ -18,8 +19,14 @@ logging.basicConfig(
     handlers=[RichHandler(show_path=False)]
 )
 
+# create file handler which logs messages
+# fh = logging.FileHandler(PATHS.LOGS_FILE_PATH)
+# fh.setLevel(logging.INFO)
+
 log = logging.getLogger("rich")
+# log.addHandler(fh)
 
 if __name__ == '__main__':
+    log.info("asd")
     pass
 

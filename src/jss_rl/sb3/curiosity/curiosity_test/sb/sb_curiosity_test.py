@@ -163,6 +163,7 @@ def test_curiosity_on_frozen_lake():
     # ec_model.learn(total_timesteps=budget)
 
 
+
 def test_curiosity_on_partially_observable_domain():
     pass
 

@@ -16,7 +16,7 @@ from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
-from jss_rl.sb3.util.episode_end_moving_average_rollout_end_logger_callback import \
+from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 
 from jss_utils.jss_logger import log

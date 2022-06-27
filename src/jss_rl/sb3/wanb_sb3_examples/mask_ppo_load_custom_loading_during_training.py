@@ -17,8 +17,8 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
 
-from jss_rl.sb3.util.dynamic_custom_instance_loader_callback import DynamicCustomInstanceLoaderCallback
-from jss_rl.sb3.util.episode_end_moving_average_rollout_end_logger_callback import \
+from jss_rl.sb3.util.callbacks.dynamic_custom_instance_loader_callback import DynamicCustomInstanceLoaderCallback
+from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 
 from jss_utils.jss_logger import log
