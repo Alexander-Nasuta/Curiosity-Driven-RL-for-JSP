@@ -99,7 +99,7 @@ class DisjunctiveGraphJssEnv(gym.Env):
 
         :param dtype:                           the dtype for the observation space. Must follow numpy notation.
 
-        :param action_mode:                     'task or 'job'. 'task' is default. Specifies weather the
+        :param action_mode:                     'task' or 'job'. 'task' is default. Specifies weather the
                                                 `action`-argument of the `DisjunctiveGraphJssEnv.step`-method
                                                 corresponds to a job or an task (or node in the graph representation)
 

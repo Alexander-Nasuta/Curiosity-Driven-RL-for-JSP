@@ -6,7 +6,7 @@ from copy import copy
 import gym
 import torch
 
-from typing import Union, List
+from typing import Union, List, Dict
 
 import numpy as np
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecEnvWrapper, VecEnv, VecEnvObs
@@ -42,9 +42,9 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
                  shuffle_samples: bool = True,
                  maximum_sample_size: int = None,
                  postprocess_on_end_of_episode: bool = True,
-                 postprocess_every_n_steps: int = 500,
+                 postprocess_every_n_steps: int = None,
 
-                 exploration_steps: int = 5000,
+                 exploration_steps: int = None,
 
                  **kwargs
                  ):
@@ -70,13 +70,14 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.postprocess_on_end_of_episode = postprocess_on_end_of_episode
         self.postprocess_every_n_steps = postprocess_every_n_steps
 
-        self._clear_memory_counter = 0
-        self._postprocess_counter = 0
 
         self.shuffle_samples = shuffle_samples
         self.maximum_sample_size = maximum_sample_size
 
         self.exploration_steps = exploration_steps
+
+        self._clear_memory_counter = 0
+        self._postprocess_counter = 0
 
         # hyper parameters
         self.beta = beta  # β
@@ -139,6 +140,18 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         self._optimizer = torch.optim.Adam(forward_params + inverse_params + feature_params, lr=self.lr)
 
+        # statistics
+        self.n_postprocessings = 0
+        self.global_stats = {
+            "n_total_episodes": 0,
+            "n_postprocessings": self.n_postprocessings,
+        }
+        self.sub_env_stats = [{
+            "extrinsic_rewards": [],
+            "intrinsic_rewards": [],
+            "n_sub_env_episodes": 0,
+        } for _ in range(self.venv.num_envs)]
+
     def _one_hot_encoding(self, venv_observations: np.ndarray, n: int = None) -> np.ndarray:
         if not n:
             if isinstance(self.venv.observation_space, gym.spaces.Discrete):
@@ -167,18 +180,62 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.actions = actions
         self.venv.step_async(actions)
 
+    def _extend_infos(self, augmented_rewards: np.ndarray, original_rewards: np.ndarray, intrinsic_rewards: np.ndarray,
+                      dones: np.ndarray, infos) -> List[Dict]:
+
+        self.global_stats["n_total_episodes"] += dones.sum()
+        self.global_stats["n_postprocessings"] = self.n_postprocessings
+        self.global_stats["_num_timesteps"] = self._num_timesteps
+
+        extended_infos = [info.copy() for info in infos]
+
+        for i in range(self.venv.num_envs):
+            self.sub_env_stats[i]["extrinsic_rewards"].append(original_rewards[i])
+            self.sub_env_stats[i]["intrinsic_rewards"].append(intrinsic_rewards[i])
+
+            if dones[i]:
+                self.sub_env_stats[i]["n_sub_env_episodes"] += 1
+
+                extended_infos[i]["extrinsic_return"] = sum(self.sub_env_stats[i]["extrinsic_rewards"])
+                self.sub_env_stats[i]["extrinsic_rewards"] = []
+
+                extended_infos[i]["intrinsic_return"] = sum(self.sub_env_stats[i]["intrinsic_rewards"])
+                self.sub_env_stats[i]["intrinsic_rewards"] = []
+
+                extended_infos[i]["bonus_return"] = extended_infos[i]["intrinsic_return"]
+                extended_infos[i]["total_return"] = \
+                    extended_infos[i]["intrinsic_return"] + extended_infos[i]["extrinsic_return"]
+
+            extended_infos[i]["extrinsic_reward"] = original_rewards[i]
+            extended_infos[i]["intrinsic_reward"] = intrinsic_rewards[i]
+            extended_infos[i]["bonus_reward"] = intrinsic_rewards[i]
+            extended_infos[i]["total_reward"] = augmented_rewards[i]
+            extended_infos[i]["n_total_episodes"] = self.global_stats["n_total_episodes"]
+            extended_infos[i]["n_postprocessings"] = self.global_stats["n_postprocessings"]
+            extended_infos[i]["_num_timesteps"] = self.global_stats["_num_timesteps"]
+
+        return extended_infos
+
     def step_wait(self) -> VecEnvStepReturn:
         """Overrides VecEnvWrapper.step_wait."""
         observations, rewards, dones, infos = self.venv.step_wait()
         # return original obs at the end
         original_obs = observations
         observations = self._process_obs_if_needed(observations)
+
         intrinsic_rewards = np.zeros(self.venv.num_envs)
 
         # return if all exploration steps are done
         if self.exploration_steps is not None and self._num_timesteps > self.exploration_steps:
             # self._rest_statistics_on_episode_end(dones=dones)
-            return original_obs, rewards, dones, infos
+            extended_infos = self._extend_infos(
+                augmented_rewards=rewards,
+                original_rewards=rewards,
+                intrinsic_rewards=intrinsic_rewards,
+                dones=dones,
+                infos=infos,
+            )
+            return original_obs, rewards, dones, extended_infos
 
         # add tuples to memory
         for i in range(self.venv.num_envs):
@@ -192,11 +249,13 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
             if done:
                 # postprocess
                 if self.postprocess_on_end_of_episode:
-                    self.postprocess_trajectory(
+                    post_process_infos = self.postprocess_trajectory(
                         obs=self.prev_obs_memory[i],
                         next_obs=self.obs_memory[i],
                         actions=self.action_memory[i]
                     )
+                    # add infos to infos dicts
+                    infos[i] = {**post_process_infos, **infos[i]}
                 # reset memory
                 if self.clear_memory_on_end_of_episode:
                     self.prev_obs_memory[i] = deque(maxlen=self.memory_capacity)
@@ -205,18 +264,20 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         # trigger for postprocessing
         if self.postprocess_every_n_steps and self._postprocess_counter >= self.postprocess_every_n_steps:
-            print(f"step: {self._num_timesteps}, _postprocess_counter: {self._postprocess_counter}")
 
             # concat values from all sub envs
             prev_obs = list(itertools.chain.from_iterable(self.prev_obs_memory))
             actions = list(itertools.chain.from_iterable(self.action_memory))
             obs = list(itertools.chain.from_iterable(self.obs_memory))
 
-            self.postprocess_trajectory(
+            post_process_infos = self.postprocess_trajectory(
                 obs=prev_obs,
                 actions=actions,
                 next_obs=obs
             )
+            # add infos to infos dicts
+            for i in range(self.venv.num_envs):
+                infos[i] = {**post_process_infos, **infos[i]}
 
             self._postprocess_counter = 0
 
@@ -224,9 +285,9 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         if self.prev_observations is not None and self.actions is not None:
             # calc intrinsic reward
             intrinsic_rewards = self._calc_intrinsic_reward(
-                    obs=self.prev_observations,
-                    actions=self.actions,
-                    next_obs=observations
+                obs=self.prev_observations,
+                actions=self.actions,
+                next_obs=observations
             )
 
         augmented_rewards = rewards + intrinsic_rewards
@@ -242,9 +303,20 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         # override previous observations
         self.prev_observations = observations
 
-        return original_obs, augmented_rewards, dones, infos
 
-    def postprocess_trajectory(self, obs, next_obs, actions):
+        extended_infos = self._extend_infos(
+            augmented_rewards=augmented_rewards,
+            original_rewards=rewards,
+            intrinsic_rewards=intrinsic_rewards,
+            dones=dones,
+            infos=infos,
+        )
+
+        return original_obs, augmented_rewards, dones, extended_infos
+
+    def postprocess_trajectory(self, obs, next_obs, actions) -> Dict[str, float]:
+
+        self.n_postprocessings += 1
 
         if self.shuffle_samples:
             from sklearn.utils import shuffle
@@ -355,6 +427,12 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         loss.backward()
         self._optimizer.step()
 
+        return {
+            "loss": loss.item(),
+            "inverse_loss": inverse_loss.item(),
+            "forward_loss": forward_loss.item(),
+        }
+
     def _calc_intrinsic_reward(self, obs: np.ndarray, actions: np.ndarray, next_obs: np.ndarray):
         with torch.no_grad():
             # Push both observations through feature net to get both phis.
@@ -408,7 +486,7 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
             #     ⎝                  ⎠     2
             #
             forward_l2_norm_sqared = 0.5 * torch.sum(
-               torch.pow(predicted_next_phi - next_phi, 2.0), dim=-1
+                torch.pow(predicted_next_phi - next_phi, 2.0), dim=-1
             )
 
             intrinsic_rewards = self.eta * forward_l2_norm_sqared.detach().cpu().numpy()
@@ -526,15 +604,18 @@ if __name__ == '__main__':
 
     icm_venv = IntrinsicCuriosityModuleWrapper(
         venv=venv,
-        postprocess_every_n_steps=1 * 16,
         exploration_steps=int(0.5 * budget),
         feature_net_hiddens=[],
         forward_fcnet_net_hiddens=[256],
         inverse_feature_net_hiddens=[256],
-        postprocess_sample_size=16,
-        clear_memory_on_end_of_episode=False,
+
+        maximum_sample_size=16,
+
+        clear_memory_on_end_of_episode=True,
         postprocess_on_end_of_episode=True,
 
+        clear_memory_every_n_steps=None,
+        postprocess_every_n_steps=None,
     )
     icm_venv = VecMonitor(venv=icm_venv)
     icm_model = PPO('MlpPolicy', icm_venv, verbose=0)

@@ -1,33 +1,32 @@
+import math
 import pprint
+
 import gym
 import numpy as np
 import sb3_contrib
-
 import torch as th
 import wandb as wb
-from rich.progress import track
-from sb3_contrib.common.wrappers import ActionMasker
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import VecVideoRecorder
-from wandb.integration.sb3 import WandbCallback
 
 import jss_utils.PATHS as PATHS
-import jss_utils.jsp_instance_parser as parser
-import jss_utils.jsp_instance_details as details
-from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
-    EpisodeEndMovingAverageRolloutEndLoggerCallback
+import jss_utils.jsp_env_utils as env_utils
 
+from types import ModuleType
+from rich.progress import track
+
+from wandb.integration.sb3 import WandbCallback
+
+from sb3_contrib.common.wrappers import ActionMasker
+from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
+
+from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
+from jss_rl.sb3.curiosity.icm2 import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.jss.jss_logger_callback import JssLoggerCallback
+from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_utils.jss_logger import log
 
-from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
-
-PROJECT = "mask_ppo_test1"
-BENCHMARK_INSTANCE_NAME = "ft06"
-
 wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
-
-jsp_instance = parser.get_instance_by_name(BENCHMARK_INSTANCE_NAME)
-jsp_instance_details = details.get_jps_instance_details(BENCHMARK_INSTANCE_NAME)
 
 gym.envs.register(
     id='GraphJsp-v0',
@@ -35,47 +34,60 @@ gym.envs.register(
     kwargs={},
 )
 
-sweep_config = {
+PROJECT = "6x6_ft06_tuning"
+
+SWEEP_CONFIG = {
     'method': 'random',
     'metric': {
-        'name': 'mean_return',
-        'goal': 'maximize'
+        'name': 'mean_makespan',
+        'goal': 'minimize'
     },
+    "name": "6x6_ft06_mask_ppo_fine_tuning_random",
+
     'parameters': {
         "gamma": {
-            "distribution": "uniform",
-            "min": 0.9,
+            "distribution": "q_uniform",
+            "min": 0.95,
             "max": 1,
+            "q": 0.01
         },
         "gae_lambda": {
-            "distribution": "uniform",
+            "distribution": "q_uniform",
             "min": 0.9,
             "max": 1,
+            "q": 0.025
         },
         "learning_rate": {
-            "values": [1e-2, 1e-3, 1e-4, 3e-4, 3e-5, 1e-5]
+            'distribution': 'log_uniform',
+            'min': math.log(0.000001),
+            'max': math.log(0.01)
         },
         "batch_size": {
-            'values': [16, 32, 64, 128, 256, 512, 1024, 2048]
+            'values': [128, 256, 512, 1024]
         },
         "clip_range": {
-            'values': [0.02, 0.06, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+            "distribution": "q_uniform",
+            "min": 0.4,
+            "max": 1.0,
+            "q": 0.1
         },
         "clip_range_vf": {
-            'values': [26]
-        },
-        "ent_coef": {
-            "values": [1e-2, 1e-3, 1e-4, 3e-4, 3e-5, 1e-5, 1e-6, 1e-7, 1e-8]
+            "distribution": "q_uniform",
+            "min": 0.4,
+            "max": 1.0,
+            "q": 0.1
         },
         "normalize_advantage": {
             'values': [True, False]
         },
-        # "target_kl": 0.05047, # for early stopping
         "net_arch_n_layers": {
-            'values': [2, 3, 4]
+            'values': [2, 3]
         },
         "net_arch_n_size": {
-            'values': [8, 16, 32, 64, 128, 256]
+            "distribution": "q_uniform",
+            "min": 10,
+            "max": 60,
+            "q": 10.0
         },
         "ortho_init": {
             'values': [True, False]
@@ -89,16 +101,18 @@ sweep_config = {
         "optimizer_eps": {  # for th.optim.Adam
             "values": [1e-5, 1e-6, 1e-7, 1e-8]
         },
-
         # env params
+        "action_mode": {
+            'values': ['task', 'job']
+        },
         "normalize_observation_space": {
-            'values': [True, False]
+            'values': [True]
         },
         "flat_observation_space": {
-            'values': [True, False]
+            'values': [True]
         },
         "perform_left_shift_if_possible": {
-            'values': [True, False]
+            'values': [False, True]
         },
         "dtype": {
             'values': ["float32"]
@@ -106,71 +120,67 @@ sweep_config = {
 
         # eval params
         "n_eval_episodes": {
-            'value': 10
+            'value': 50
         }
     }
 }
 
-RUN_CONFIG = {
-    "total_timesteps": 100_000,
-    "n_envs": 8,  # multiprocessing.cpu_count()-1
-
-    "instance_name": BENCHMARK_INSTANCE_NAME,
-    "instance_details": jsp_instance_details,
-
-    "policy_type": MaskableActorCriticPolicy,
-    "model_hyper_parameters": {
-        "gamma": 0.99,  # discount factor,
-        "gae_lambda": 0.95,
-        "learning_rate": 3e-4,
-        "batch_size": 64,
-        "clip_range": 0.541,
-        "clip_range_vf": 26,
-        "ent_coef": 0.0,
-        "normalize_advantage": True,
-        # "target_kl": 0.05047, # for early stopping
-        "policy_kwargs": {
-            "net_arch": [{
-                "pi": [64, 64],
-                "vf": [64, 64],
-            }],
-            "ortho_init": True,
-            "activation_fn": th.nn.Tanh,  # th.nn.ReLU
-            "optimizer_kwargs": {  # for th.optim.Adam
-                "eps": 1e-5
-            }
-        }
-    },
-
-    "env_name": "GraphJsp-v0",
-    "env_kwargs": {
-        "scale_reward": True,
-        "normalize_observation_space": True,
-        "flat_observation_space": True,
-        "perform_left_shift_if_possible": True,
-        "default_visualisations": [
-            "gantt_window",
-            # "graph_window",  # very expensive
-        ]
-    },
-
-    "EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs": {
-        "fields": [
-            "extrinsic_reward",
-            "makespan",
-            "scaling_divisor"
-        ],
-        "capacity": 100,
-    },
-
-}
-
 
 def perform_run():
+    instance_name = "ft06"
+    jsp_instance, jsp_instance_details = env_utils.get_benchmark_instance_and_details(name=instance_name)
+    _, n_jobs, n_machines = jsp_instance.shape
+
+
+    RUN_CONFIG = {
+        "total_timesteps": 100_000,
+        "n_envs": 8,  # multiprocessing.cpu_count()-1
+
+        "instance_name": instance_name,
+        "instance_details": jsp_instance_details,
+
+        "policy_type": MaskableActorCriticPolicy,
+        "model_hyper_parameters": {
+            "gamma": 0.99,  # discount factor,
+            "gae_lambda": 0.95,
+            "learning_rate": 3e-4,
+            "batch_size": 64,
+            "clip_range": 0.541,
+            "clip_range_vf": None,
+            "ent_coef": 0.0,
+            "normalize_advantage": True,
+            # "target_kl": 0.05047, # for early stopping
+            "policy_kwargs": {
+                "net_arch": [{
+                    "pi": [64, 64],
+                    "vf": [64, 64],
+                }],
+                "ortho_init": True,
+                "activation_fn": th.nn.Tanh,  # th.nn.ReLU
+                "optimizer_kwargs": {  # for th.optim.Adam
+                    "eps": 1e-5
+                }
+            }
+        },
+
+        "env_name": "GraphJsp-v0",
+        "env_kwargs": {
+            "scale_reward": True,
+            "normalize_observation_space": True,
+            "flat_observation_space": True,
+            "perform_left_shift_if_possible": True,
+            "default_visualisations": [
+                "gantt_window",
+                # "graph_window",  # very expensive
+            ]
+        },
+
+    }
+
     with wb.init(
-            sync_tensorboard=True,
-            monitor_gym=True,  # auto-upload the videos of agents playing the game
-            save_code=True,  # optional
+            sync_tensorboard=False,
+            monitor_gym=False,  # auto-upload the videos of agents playing the game
+            save_code=False,  # optional
             dir=f"{PATHS.WANDB_PATH}/") as run:
 
         log.info(f"run name: {run.name}, run id: {run.id}")
@@ -184,7 +194,6 @@ def perform_run():
             "batch_size",
             "clip_range",
             "clip_range_vf",
-            "ent_coef",
             "normalize_advantage"
         ]
         for m_param in model_params:
@@ -195,6 +204,7 @@ def perform_run():
             "flat_observation_space",
             "perform_left_shift_if_possible",
             "dtype",
+            "action_mode",
         ]
 
         for env_param in env_params:
@@ -229,13 +239,17 @@ def perform_run():
         def mask_fn(env):
             return env.valid_action_mask()
 
-        venv = make_vec_env(
+        venv = make_vec_env_without_monitor(
             env_id=RUN_CONFIG["env_name"],
             env_kwargs=env_kwargs,
             wrapper_class=ActionMasker,
             wrapper_kwargs={"action_mask_fn": mask_fn},
             n_envs=RUN_CONFIG["n_envs"]
         )
+
+        venv = CuriosityInfoWrapper(venv=venv)
+
+        venv = VecMonitor(venv=venv)
 
         log.info(f"setting up mask ppo model")
 
@@ -252,23 +266,35 @@ def perform_run():
             model_save_path=PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}"),
             verbose=1,
         )
-
-        logger_cb = EpisodeEndMovingAverageRolloutEndLoggerCallback(
-            **RUN_CONFIG["EpisodeEndMovingAverageRolloutEndLoggerCallback_kwargs"],
-        )
+        logger_cb = JssLoggerCallback(wandb_ref=wb)
 
         log.info(f"training the agent")
         model.learn(
             total_timesteps=RUN_CONFIG["total_timesteps"],
-            callback=[wb_cb, logger_cb]
+            callback=[
+                wb_cb,
+                logger_cb
+            ]
         )
-
-        _, n_jobs, n_machines = jsp_instance.shape
-        episode_len = n_jobs * n_machines
 
         log.info("evaluating model performance")
         n_eval_episodes = sweep_params["n_eval_episodes"]
-        eval_rewards = []
+        makespans = []
+
+        eval_env_kwargs = env_kwargs.copy()
+        eval_env_kwargs["perform_left_shift_if_possible"] = True
+
+        venv = make_vec_env_without_monitor(
+            env_id=RUN_CONFIG["env_name"],
+            env_kwargs=eval_env_kwargs,
+            wrapper_class=ActionMasker,
+            wrapper_kwargs={"action_mask_fn": mask_fn},
+            n_envs=RUN_CONFIG["n_envs"]
+        )
+
+        venv = VecMonitor(venv=venv)
+
+        model.set_env(venv)
 
         for _ in track(range(n_eval_episodes), description="evaluating model performance ..."):
             done = False
@@ -279,36 +305,27 @@ def perform_run():
                 obs, rewards, dones, info = venv.step(action)
                 done = np.all(dones == True)
                 if done:
-                    for r in rewards:
-                        eval_rewards.append(r)
+                    for sub_env_info in info:
+                        makespans.append(sub_env_info["makespan"])
 
         from statistics import mean
-        mean_return = mean(eval_rewards)
+        mean_return = mean(makespans)
 
-        log.info(f"mean evaluation return: {mean_return:.2f}")
-        wb.log({"mean_return": mean_return})
-
-        # somehow the mask ppo does not work trigger properly. the step appears to count only to the batch size and then
-        # start again at step 0
-        # therefore here is a workaround
-        log.info(f"setting up video recorder")
-
-        video_folder = PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}")
-
-        venv = VecVideoRecorder(
-            venv=venv,
-            video_folder=video_folder,
-            record_video_trigger=lambda x: x == 0,
-            video_length=episode_len,
-            name_prefix=f"{run.name}_{run.id}")
+        log.info(f"mean evaluation makespan: {mean_return:.2f}")
+        wb.log({"mean_makespan": mean_return})
 
         obs = venv.reset()
-
         venv.close()
+        del venv
 
 
 if __name__ == '__main__':
-    sweep_id = wb.sweep(sweep_config, project=PROJECT)
-    # sweep_id = "5r0oucpj"
+    #sweep_id = wb.sweep(SWEEP_CONFIG, project=PROJECT)
+    sweep_id = "ia0qovaq"
     log.info(f"use this 'sweep_id': '{sweep_id}'")
-    wb.agent(sweep_id, function=perform_run, count=10, project=PROJECT)
+    wb.agent(
+        sweep_id,
+        function=perform_run,
+        count=100,
+        project=PROJECT
+    )

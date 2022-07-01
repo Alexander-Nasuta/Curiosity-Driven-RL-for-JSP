@@ -43,7 +43,7 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True):
 
         if candidates:
             candidates = [
-                (i, job_processing_times[(i-1) // env.n_machines])
+                (i, job_processing_times[(i-1) % env.n_machines])
                 for i in candidates
             ]
             action, _ = max(candidates, key=lambda data: data[1])

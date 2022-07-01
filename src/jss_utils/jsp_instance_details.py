@@ -137,7 +137,6 @@ def update_custom_instance_details() -> None:
             "lb_optimal": status == "OPTIMAL",
             "path": str(custom_instance),
             "gantt_df": df.to_dict(),
-            **info
         }
 
     log.info(f"saving details to .json file ('{PATHS.JPS_BENCHMARK_INSTANCES_DETAILS_FILE_PATH}')")

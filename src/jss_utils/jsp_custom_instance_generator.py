@@ -95,6 +95,6 @@ def generate_jsp_instances(n_instances: int = 100, n_jobs: int = 3, n_machines: 
 if __name__ == '__main__':
     generate_jsp_instances(
         n_instances=1000,
-        n_jobs=2,
-        n_machines=3
+        n_jobs=6,
+        n_machines=6
     )
