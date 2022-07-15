@@ -1,29 +1,15 @@
 import pprint
-from typing import Optional, Tuple, Union
-from ray.rllib.models.tf.tf_action_dist import Categorical, MultiCategorical
 
 import gym
 import gym_minigrid
 
 import numpy as np
-from gym import Space
-from gym.spaces import Discrete, MultiDiscrete
 
 from ray import tune
-from ray.rllib import SampleBatch
-from ray.rllib.models import ModelV2, ModelCatalog, ActionDistribution
-from ray.rllib.models.torch.misc import SlimFC
-from ray.rllib.models.torch.torch_action_dist import TorchCategorical, TorchMultiCategorical
-from ray.rllib.models.utils import get_activation_fn
-from ray.rllib.utils import try_import_tf, try_import_torch, override, NullContextManager
-from ray.rllib.utils.exploration import Exploration
-from ray.rllib.utils.from_config import from_config
-from ray.rllib.utils.tf_utils import get_placeholder, one_hot as tf_one_hot
-from ray.rllib.utils.typing import ModelConfigDict, FromConfigSpec, TensorType
 from tabulate import tabulate
 from collections import deque
 
-from jss_rl.sb3.curiosity.curiosity_test.ray.icm2 import Curiosity3
+from jss_rl.rllib.icm2 import Curiosity3
 from jss_utils.jss_logger import log
 
 from ray.rllib.agents import DefaultCallbacks

@@ -1,3 +1,4 @@
+import math
 import pprint
 
 import gym
@@ -41,70 +42,201 @@ SWEEP_CONFIG = {
         'name': 'mean_makespan',
         'goal': 'minimize'
     },
+    "name": "6x6_ft06_mask_ppo_sweep_random_1",
+
     'parameters': {
+        # gamma: float = 0.99,
+        # Discount factor
         "gamma": {
             "distribution": "uniform",
-            "min": 0.9,
+            "min": 0.99,
             "max": 1,
         },
+        # gae_lambda: float = 0.95,
+        # Factor for trade-off of bias vs variance for Generalized Advantage Estimator
         "gae_lambda": {
             "distribution": "uniform",
-            "min": 0.9,
+            "min": 0.8,
             "max": 1,
         },
+        # max_grad_norm: float = 0.5,
+        # The maximum value for the gradient clipping
+        "max_grad_norm": {
+            "distribution": "uniform",
+            "min": 0.3,
+            "max": 0.7,
+        },
+
+        # learning_rate: Union[float, Schedule] = 3e-4,
+        # The learning rate, it can be a function of the current progress remaining (from 1 to 0)
         "learning_rate": {
-            "values": [
-                1e-2, 3e-2,
-                1e-3, 3e-3,
-                1e-4, 3e-4,
-                1e-5, 3e-5]
+            'distribution': 'log_uniform',
+            'min': math.log(0.00001),
+            'max': math.log(0.001)
         },
+
+        # batch_size: Optional[int] = 64,
+        # Minibatch size
         "batch_size": {
-            'values': [16, 32, 64, 128, 256, 512, 1024]
+            'distribution': 'q_log_uniform',
+            'min': math.log(32),
+            'max': math.log(2048),
+            "q": 1
         },
+        # clip_range: Union[float, Schedule] = 0.2,
+        # Clipping parameter, it can be a function of the current progress remaining (from 1 to 0).
         "clip_range": {
-            'values': [0.02, 0.06, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+            'values': [0.2]
         },
+
+        # clip_range_vf: Union[None, float, Schedule] = None,
+        #
+        # Clipping parameter for the value function,
+        # it can be a function of the current progress remaining (from 1 to 0).
+        # This is a parameter specific to the OpenAI implementation.
+        # If None is passed (default), no clipping will be done on the value function.
+        #
+        # IMPORTANT: this clipping depends on the reward scaling.
+        #
         "clip_range_vf": {
-            'values': [26]  # mistake should be between 0.0 and 1.0
+            'values': [
+                None
+            ]
         },
+
+        # vf_coef: float = 0.5,
+        # Value function coefficient for the loss calculation
+        "vf_coef": {
+            "distribution": "uniform",
+            "min": 0.3,
+            "max": 0.7,
+        },
+
+        # ent_coef: float = 0.0,
+        # Entropy coefficient for the loss calculation
         "ent_coef": {
-            "values": [1e-2, 1e-3, 1e-4, 3e-4, 3e-5, 1e-5]
+            'values': [0.0]
         },
+
+        # normalize_advantage: bool = True
+        # Whether to normalize or not the advantage
         "normalize_advantage": {
             'values': [True, False]
         },
+        # n_epochs: int = 10,
+        # Number of epoch when optimizing the surrogate loss
+        "n_epochs": {
+            "distribution": "q_uniform",
+            "min": 4,
+            "max": 40,
+            "q": 1
+        },
+
+        # n_steps: int = 2048,
+        # The number of steps to run for each environment per update
+        # (i.e. batch size is n_steps * n_env where n_env is number of environment
+        # copies running in parallel)
+        "n_steps": {
+            'values': [
+                1024,
+                2048,
+                4096
+            ]
+        },
+        # device: Union[th.device, str] = "auto",
+        #  Device (cpu, cuda, …) on which the code should be run. Setting it to auto,
+        #  the code will be run on the GPU if possible.
+        "device": {
+            "values": ["auto"]
+        },
+        # seed: Optional[int] = None,
+        # Seed for the pseudo random generators
+        "seed": {
+            "values": [None]
+        },
+
+        # verbose: int = 0,
+        # the verbosity level: 0 no output, 1 info, 2 debug
+        # "verbose": {
+        #     "values": [0]
+        # },
+
+        # create_eval_env: bool = False,
+        # Whether to create a second environment that will be used for evaluating the agent periodically.
+        # (Only available when passing string for the environment)
+        "create_eval_env": {
+            "values": [False]
+        },
+        # tensorboard_log: Optional[str] = None,
+        # the log location for tensorboard (if None, no logging)
+        # "tensorboard_log": {
+        #    "values": [None]
+        # },
+
+        # target_kl: Optional[float] = None,
+        # Limit the KL divergence between updates, because the clipping
+        # is not enough to prevent large update
+        # see issue #213 (cf https://github.com/hill-a/stable-baselines/issues/213)
+        # By default, there is no limit on the kl div.
+        "target_kl": {
+            "values": [None]
+        },
+
+        # policy params
+
+        # net_arch (Optional[List[Union[int, Dict[str, List[int]]]]]) –
+        # The specification of the policy and value networks.
+
+        # 'net_arch_n_layers' and 'net_arch_n_size' will result in a dict that will be passed to 'net_arch'
+        # see code below
         "net_arch_n_layers": {
-            'values': [1, 2, 3, 4]
+            'values': [1, 2, 3]
         },
         "net_arch_n_size": {
-            'values': [8, 16, 32, 64, 128, 256, 512]
+            "distribution": "q_uniform",
+            "min": 20,
+            "max": 100,
+            "q": 10.0
         },
+
+        # ortho_init: bool = True,
+        # Whether to use or not orthogonal initialization
         "ortho_init": {
-            'values': [True, False]
+            'values': [True]
         },
+        # normalize_images: bool = True,
+        "normalize_images": {
+            'values': [True]
+        },
+        # activation_fn: Type[nn.Module] = nn.Tanh
+        # Activation function
+        # https://pytorch.org/docs/stable/nn.html
         "activation_fn": {
             "values": [
                 "Tanh",  # th.nn.Tanh,
                 "ReLu",  # th.nn.ReLU
+                "Hardtanh",
+                "ELU",
+                "RRELU",
             ]
         },
+
         "optimizer_eps": {  # for th.optim.Adam
-            "values": [1e-5, 1e-6, 1e-7, 1e-8]
+            "values": [1e-7, 1e-8]
         },
 
         # env params
         "action_mode": {
-            'values': ['task', 'job']
+            'values': ['task']
         },
         "normalize_observation_space": {
-            'values': [True, False]
+            'values': [True]
         },
         "flat_observation_space": {
-            'values': [True, False]
+            'values': [True]
         },
         "perform_left_shift_if_possible": {
-            'values': [False, True]
+            'values': [True]
         },
         "dtype": {
             'values': ["float32"]
@@ -125,7 +257,7 @@ def perform_run():
 
     RUN_CONFIG = {
         "total_timesteps": 100_000,
-        "n_envs": 8,
+        "n_envs": 8,  # multiprocessing.cpu_count()-1
 
         "instance_name": instance_name,
         "instance_details": jsp_instance_details,
@@ -136,11 +268,10 @@ def perform_run():
             "gae_lambda": 0.95,
             "learning_rate": 3e-4,
             "batch_size": 64,
-            "clip_range": 0.541,
-            "clip_range_vf": 26,
+            "clip_range": 0.2,
+            "clip_range_vf": None,
             "ent_coef": 0.0,
             "normalize_advantage": True,
-            # "target_kl": 0.05047, # for early stopping
             "policy_kwargs": {
                 "net_arch": [{
                     "pi": [64, 64],
@@ -181,12 +312,23 @@ def perform_run():
 
         # override run config
         model_params = [
+            "learning_rate",
+            "n_steps",
+            "n_epochs",
             "gamma",
             "batch_size",
             "clip_range",
             "clip_range_vf",
+            "normalize_advantage",
             "ent_coef",
-            "normalize_advantage"
+            "vf_coef",
+            "max_grad_norm",
+            "target_kl",
+            # "tensorboard_log",
+            "create_eval_env",
+            # "verbose",
+            "seed",
+            "device"
         ]
         for m_param in model_params:
             RUN_CONFIG["model_hyper_parameters"][m_param] = sweep_params[m_param]
@@ -202,8 +344,18 @@ def perform_run():
         for env_param in env_params:
             RUN_CONFIG["env_kwargs"][env_param] = sweep_params[env_param]
 
+        '''
+        activation_fn: Type[nn.Module] = nn.Tanh,
+        ortho_init: bool = True,
+        features_extractor_class: Type[BaseFeaturesExtractor] = FlattenExtractor,
+        features_extractor_kwargs: Optional[Dict[str, Any]] = None,
+        normalize_images: bool = True,
+        optimizer_class: Type[th.optim.Optimizer] = th.optim.Adam,
+        optimizer_kwargs: Optional[Dict[str, Any]] = None,
+        '''
         policy_params = [
             "ortho_init",
+            "normalize_images",
         ]
         for p_param in policy_params:
             RUN_CONFIG["model_hyper_parameters"]["policy_kwargs"][p_param] = sweep_params[p_param]
@@ -212,7 +364,21 @@ def perform_run():
             "pi": [sweep_params["net_arch_n_size"]] * sweep_params["net_arch_n_layers"],
             "vf": [sweep_params["net_arch_n_size"]] * sweep_params["net_arch_n_layers"],
         }]
-        activation_fn = th.nn.ReLU if sweep_params["activation_fn"] == 'ReLu' else th.nn.Tanh
+
+        activation_fn = None
+        if sweep_params["activation_fn"] == 'ReLu':
+            activation_fn = th.nn.ReLU
+        elif sweep_params["activation_fn"] == 'Tanh':
+            activation_fn = th.nn.Tanh
+        elif sweep_params["activation_fn"] == 'Hardtanh':
+            activation_fn = th.nn.Hardtanh
+        elif sweep_params["activation_fn"] == 'ELU':
+            activation_fn = th.nn.ELU
+        elif sweep_params["activation_fn"] == 'RRELU':
+            activation_fn = th.nn.ELU
+        else:
+            raise NotImplementedError(f"activation function '{activation_fn}' is not available/implemented. "
+                                      f"You may need to add a case for your activation function")
 
         RUN_CONFIG["model_hyper_parameters"]["policy_kwargs"]["net_arch"] = net_arch
         RUN_CONFIG["model_hyper_parameters"]["policy_kwargs"]["activation_fn"] = activation_fn
@@ -313,6 +479,15 @@ def perform_run():
 
 if __name__ == '__main__':
     # sweep_id = wb.sweep(SWEEP_CONFIG, project=PROJECT)
-    sweep_id = "cny03n9f"
+
+    # you can enter the sweep id that is returned by wb.sweep(...)
+    # here and comment out the other line
+    sweep_id = "myc8px48"
+
     log.info(f"use this 'sweep_id': '{sweep_id}'")
-    wb.agent(sweep_id, function=perform_run, count=200, project=PROJECT)
+    wb.agent(
+        sweep_id,
+        function=perform_run,
+        count=100,
+        project=PROJECT
+    )

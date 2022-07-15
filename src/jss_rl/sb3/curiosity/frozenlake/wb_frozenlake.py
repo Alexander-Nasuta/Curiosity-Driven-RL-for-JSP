@@ -1,4 +1,6 @@
 import sys
+import numpy as np
+from collections import deque
 from types import ModuleType
 from typing import List
 
@@ -15,7 +17,8 @@ from wandb.integration.sb3 import WandbCallback
 from statistics import mean
 
 from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
-from jss_rl.sb3.curiosity.icm2 import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.ec import EpisodicCuriosityModuleWrapper
 from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 from jss_rl.sb3.util.callbacks.wb_info_logger_callback import WB_InfoLoggerCallback
@@ -58,6 +61,14 @@ class FrozenlakeLoggerCallBack(BaseCallback):
         self.max_distance = 0.0
         self.visited_states = set()
         self.visited_state_action_pairs = set()
+        self.max_return = 0.0
+
+        self.temp_trajectories = [
+            deque(maxlen=3 * 16) for _ in range(8)  # num envs
+        ]
+        self.best_trajectory = None
+
+        self._n_rollouts = 0
 
         self.log_fields = [
             "extrinsic_return",
@@ -71,7 +82,7 @@ class FrozenlakeLoggerCallBack(BaseCallback):
 
             "loss",
             "inverse_loss",
-            "forward_loss"
+            "forward_loss",
         ]
 
     def _get_vals(self, field: str) -> List:
@@ -79,14 +90,42 @@ class FrozenlakeLoggerCallBack(BaseCallback):
 
     def _on_step(self) -> bool:
         # self.num_timesteps
+        for i, obs in enumerate(self.locals["obs_tensor"]):
+            self.temp_trajectories[i].append(obs)
+
+
+
 
         self.max_distance = max(self.max_distance, *self._get_vals("distance_from_origin"))
+
+        new_max = max(0.0, self.max_return, *self._get_vals("total_return"))
+        if new_max > self.max_return:
+            self.max_return = new_max
+            max_i = np.argmax(np.array(self._get_vals("distance_from_origin")))
+            self.best_trajectory = list(self.temp_trajectories[max_i])
 
         self.visited_states = self.visited_states.union([obs.item() for obs in self.locals["obs_tensor"]])
 
         self.visited_state_action_pairs = self.visited_state_action_pairs.union(
             [(obs.item(), actions) for obs, actions in zip(self.locals["obs_tensor"], self.locals["actions"])]
         )
+
+        # note num_timesteps increments always in num_envs (here 8)
+        if self.num_timesteps and self.num_timesteps % 10_000 == 0:
+            print(f"len envo: {self.temp_trajectories[0]}")
+            tab = self.wandb_ref.Table(
+                columns=[" ", *[f"step_{i}" for i in range(len(self.temp_trajectories[0]))]],
+                data=[
+                    ["state", *[elem.item() for elem in self.temp_trajectories[0]]],
+                    ["state (index 1)", *[elem.item() + 1 for elem in self.temp_trajectories[0]]],
+                    ["col", *[elem.item() % 8 for elem in self.temp_trajectories[0]]],
+                    ["row", *[elem.item() // 8 for elem in self.temp_trajectories[0]]],
+                ]
+            )
+            self.wandb_ref.log({
+                f"trajectory_{self.num_timesteps}steps_env_0": tab,
+                "num_timesteps": self.num_timesteps
+            })
 
         if self.wandb_ref:
             self.wandb_ref.log({
@@ -102,8 +141,39 @@ class FrozenlakeLoggerCallBack(BaseCallback):
 
         return True
 
+    def _on_rollout_end(self) -> None:
+        self._n_rollouts += 1
+        tab = self.wandb_ref.Table(
+            columns=[" ", *[f"step_{i}" for i in range(len(self.temp_trajectories[0]))]],
+            data=[
+                ["state", *[elem.item() for elem in self.temp_trajectories[0]]],
+                ["state (index 1)", *[elem.item() + 1 for elem in self.temp_trajectories[0]]],
+                ["col", *[elem.item() % 8 for elem in self.temp_trajectories[0]]],
+                ["row", *[elem.item() // 8 for elem in self.temp_trajectories[0]]],
+            ]
+        )
+        self.wandb_ref.log({
+            f"rollout_{self._n_rollouts}_sample_trajectory": tab,
+            "num_timesteps": self.num_timesteps
+        })
 
-def main(num_samples=5):
+    def _on_training_end(self) -> None:
+        tab = self.wandb_ref.Table(
+            columns=[" ", *[f"step_{i}" for i in range(len(self.best_trajectory))]],
+            data=[
+                ["state", *[elem.item() for elem in self.best_trajectory]],
+                ["state (index 1)", *[elem.item() + 1 for elem in self.best_trajectory]],
+                ["col", *[elem.item() % 8 for elem in self.best_trajectory]],
+                ["row", *[elem.item() // 8 for elem in self.best_trajectory]],
+            ]
+        )
+        self.wandb_ref.log({
+            "highest_score_trajectory": tab,
+            "num_timesteps": self.num_timesteps
+        })
+
+
+def main(num_samples=1):
     project = "frozenlake-sb3_dev"
     config = {}
     config["total_timesteps"] = 50_000
@@ -149,6 +219,7 @@ def main(num_samples=5):
     }
 
     for _ in track(range(num_samples), description="running experiments with plain PPO"):
+        break
         run = wb.init(
             project=project,
             group="PPO",
@@ -197,6 +268,7 @@ def main(num_samples=5):
         run.finish()
 
     for _ in track(range(num_samples), description="running experiments with PPO and ICM"):
+        break
         icm_config = config.copy()
         icm_config["IntrinsicCuriosityModuleWrapper"] = {
             "beta": 0.2,
@@ -273,6 +345,71 @@ def main(num_samples=5):
 
         run.finish()
 
+    for _ in track(range(num_samples), description="running experiments with PPO and EC"):
+        ec_config = config.copy()
+        ec_config["EpisodicCuriosityModuleWrapper"] = {
+            "alpha": 1.0,
+            "beta": 0.5,
+            "gamma": 2,
+            "embedding_dim": 64,
+            "episodic_memory_capacity": 8,
+            "clear_memory_every_episode": True
+        }
+
+        run = wb.init(
+            project=project,
+            group="PPO + EC (no memory reset)"
+            if not ec_config["EpisodicCuriosityModuleWrapper"]["clear_memory_every_episode"]
+            else "PPO + EC",
+            config=ec_config,
+            sync_tensorboard=True,
+            monitor_gym=True,  # auto-upload the videos of agents playing the game
+            save_code=True,  # optional
+            dir=f"{PATHS.WANDB_PATH}/",
+        )
+
+        venv = make_vec_env_without_monitor(
+            env_id=ec_config["env_name"],
+            env_kwargs=ec_config["env_kwargs"],
+            wrapper_class=ec_config["wrapper_class"],
+            wrapper_kwargs=ec_config["wrapper_kwargs"],
+            n_envs=ec_config["n_envs"]  # basically the same as config["num_workers"] = 0
+        )
+
+        venv = DistanceWrapper(venv=venv)  # equivalent to `MyCallBack`
+
+        venv = EpisodicCuriosityModuleWrapper(
+            venv=venv,
+            **ec_config["EpisodicCuriosityModuleWrapper"]
+        )
+
+        venv = VecMonitor(venv=venv)
+
+        model = sb3.PPO(
+            "MlpPolicy",
+            env=venv,
+            verbose=1,
+            tensorboard_log=PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}"),
+            **ec_config["model_hyper_parameters"]
+        )
+
+        wb_cb = WandbCallback(
+            gradient_save_freq=100,
+            model_save_path=PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}"),
+            verbose=1,
+        )
+
+        logger_cb = FrozenlakeLoggerCallBack(
+            wandb_ref=wb,
+        )
+
+        model.learn(
+            total_timesteps=ec_config["total_timesteps"],
+            callback=[wb_cb, logger_cb]
+        )
+
+        run.finish()
+
 
 if __name__ == '__main__':
-    main(num_samples=5)
+    main(num_samples=1)

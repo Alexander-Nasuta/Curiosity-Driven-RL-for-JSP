@@ -21,7 +21,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
 
 from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
-from jss_rl.sb3.curiosity.icm2 import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
 from jss_rl.sb3.curiosity.jss.jss_logger_callback import JssLoggerCallback
 from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_utils.jss_logger import log

@@ -21,7 +21,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
 
 from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
-from jss_rl.sb3.curiosity.icm2 import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
 from jss_rl.sb3.curiosity.jss.jss_logger_callback import JssLoggerCallback
 from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_utils.jss_logger import log
@@ -42,31 +42,32 @@ SWEEP_CONFIG = {
         'name': 'mean_makespan',
         'goal': 'minimize'
     },
-    "name": "6x6_ft06_mask_ppo_fine_tuning_random2",
+    "name": "6x6_ft06_mask_ppo_sweep_random_1",
 
     'parameters': {
         # gamma: float = 0.99,
         # Discount factor
         "gamma": {
-            'values': [
-                1.0,
-                0.99,
-                0.9
-            ]
+            "distribution": "q_uniform",
+            "min": 0.99,
+            "max": 1,
+            "q": 0.001
         },
         # gae_lambda: float = 0.95,
         # Factor for trade-off of bias vs variance for Generalized Advantage Estimator
         "gae_lambda": {
-            'values': [
-                1.0,
-                0.925,
-                0.975
-            ]
+            "distribution": "q_uniform",
+            "min": 0.9,
+            "max": 1,
+            "q": 0.1
         },
         # max_grad_norm: float = 0.5,
         # The maximum value for the gradient clipping
         "max_grad_norm": {
-            'values': [0.5]
+            "distribution": "q_uniform",
+            "min": 0.1,
+            "max": 0.9,
+            "q": 0.1
         },
 
         # learning_rate: Union[float, Schedule] = 3e-4,
@@ -86,9 +87,9 @@ SWEEP_CONFIG = {
         # Clipping parameter, it can be a function of the current progress remaining (from 1 to 0).
         "clip_range": {
             "distribution": "q_uniform",
-            "min": 0.5,
-            "max": 0.9,
-            "q": 0.125
+            "min": 0.2,
+            "max": 1.0,
+            "q": 0.2
         },
 
         # clip_range_vf: Union[None, float, Schedule] = None,
@@ -103,22 +104,29 @@ SWEEP_CONFIG = {
         "clip_range_vf": {
             'values': [
                 None,
-                0.9,
-                0.8
+                0.25,
+                0.5,
+                0.75,
+                1.0
             ]
         },
 
         # vf_coef: float = 0.5,
         # Value function coefficient for the loss calculation
         "vf_coef": {
-            'values': [0.5]
+            "distribution": "q_uniform",
+            "min": 0.25,
+            "max": 1,
+            "q": 0.25
         },
-
 
         # ent_coef: float = 0.0,
         # Entropy coefficient for the loss calculation
         "ent_coef": {
-            'values': [0.0]
+            "distribution": "q_uniform",
+            "min": 0.0,
+            "max": 1.0,
+            "q": 0.5
         },
 
         # normalize_advantage: bool = True
@@ -141,7 +149,11 @@ SWEEP_CONFIG = {
         # (i.e. batch size is n_steps * n_env where n_env is number of environment
         # copies running in parallel)
         "n_steps": {
-            'values': [2048]
+            'values': [
+                1024,
+                2048,
+                4096
+            ]
         },
         # device: Union[th.device, str] = "auto",
         #  Device (cpu, cuda, …) on which the code should be run. Setting it to auto,
@@ -182,9 +194,6 @@ SWEEP_CONFIG = {
             "values": [None]
         },
 
-
-
-
         # policy params
 
         # net_arch (Optional[List[Union[int, Dict[str, List[int]]]]]) –
@@ -220,22 +229,17 @@ SWEEP_CONFIG = {
                 "ReLu",  # th.nn.ReLU
                 "Hardtanh",
                 "ELU",
-                "RRELU"
+                "RRELU",
             ]
         },
-
-
-
 
         "optimizer_eps": {  # for th.optim.Adam
             "values": [1e-7, 1e-8]
         },
 
-
-
         # env params
         "action_mode": {
-            'values': ['task']
+            'values': ['task', 'job']
         },
         "normalize_observation_space": {
             'values': [True]
@@ -244,7 +248,7 @@ SWEEP_CONFIG = {
             'values': [True]
         },
         "perform_left_shift_if_possible": {
-            'values': [True]
+            'values': [True, False]
         },
         "dtype": {
             'values': ["float32"]
@@ -262,7 +266,6 @@ def perform_run():
     instance_name = "ft06"
     jsp_instance, jsp_instance_details = env_utils.get_benchmark_instance_and_details(name=instance_name)
     _, n_jobs, n_machines = jsp_instance.shape
-
 
     RUN_CONFIG = {
         "total_timesteps": 100_000,
@@ -353,7 +356,6 @@ def perform_run():
         for env_param in env_params:
             RUN_CONFIG["env_kwargs"][env_param] = sweep_params[env_param]
 
-
         '''
         activation_fn: Type[nn.Module] = nn.Tanh,
         ortho_init: bool = True,
@@ -375,8 +377,20 @@ def perform_run():
             "vf": [sweep_params["net_arch_n_size"]] * sweep_params["net_arch_n_layers"],
         }]
 
-        raise NotImplementedError("bruh mach implemtierung")
-        activation_fn = th.nn.ReLU if sweep_params["activation_fn"] == 'ReLu' else th.nn.Tanh
+        activation_fn = None
+        if sweep_params["activation_fn"] == 'ReLu':
+            activation_fn = th.nn.ReLU
+        elif sweep_params["activation_fn"] == 'Tanh':
+            activation_fn = th.nn.Tanh
+        elif sweep_params["activation_fn"] == 'Hardtanh':
+            activation_fn = th.nn.Hardtanh
+        elif sweep_params["activation_fn"] == 'ELU':
+            activation_fn = th.nn.ELU
+        elif sweep_params["activation_fn"] == 'RRELU':
+            activation_fn = th.nn.ELU
+        else:
+            raise NotImplementedError(f"activation function '{activation_fn}' is not available/implemented. "
+                                      f"You may need to add a case for your activation function")
 
         RUN_CONFIG["model_hyper_parameters"]["policy_kwargs"]["net_arch"] = net_arch
         RUN_CONFIG["model_hyper_parameters"]["policy_kwargs"]["activation_fn"] = activation_fn
@@ -476,12 +490,16 @@ def perform_run():
 
 
 if __name__ == '__main__':
-    sweep_id = wb.sweep(SWEEP_CONFIG, project=PROJECT)
-    #sweep_id = "ia0qovaq"
+    # sweep_id = wb.sweep(SWEEP_CONFIG, project=PROJECT)
+
+    # you can enter the sweep id that is returned by wb.sweep(...)
+    # here and comment out the other line
+    sweep_id = "ax11ve1x"
+
     log.info(f"use this 'sweep_id': '{sweep_id}'")
     wb.agent(
         sweep_id,
         function=perform_run,
-        count=1,
+        count=300,
         project=PROJECT
     )

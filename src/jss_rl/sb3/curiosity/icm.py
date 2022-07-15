@@ -1,5 +1,4 @@
 import itertools
-import sys
 from collections import deque
 from copy import copy
 
@@ -145,6 +144,7 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.global_stats = {
             "n_total_episodes": 0,
             "n_postprocessings": self.n_postprocessings,
+            "memory_size": len(self.obs_memory)
         }
         self.sub_env_stats = [{
             "extrinsic_rewards": [],
@@ -186,6 +186,7 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.global_stats["n_total_episodes"] += dones.sum()
         self.global_stats["n_postprocessings"] = self.n_postprocessings
         self.global_stats["_num_timesteps"] = self._num_timesteps
+        self.global_stats["memory_size"] = len(self.obs_memory)
 
         extended_infos = [info.copy() for info in infos]
 
@@ -213,6 +214,8 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
             extended_infos[i]["n_total_episodes"] = self.global_stats["n_total_episodes"]
             extended_infos[i]["n_postprocessings"] = self.global_stats["n_postprocessings"]
             extended_infos[i]["_num_timesteps"] = self.global_stats["_num_timesteps"]
+            extended_infos[i]["memory_size"] = self.global_stats["memory_size"]
+
 
         return extended_infos
 

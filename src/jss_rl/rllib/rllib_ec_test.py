@@ -1,18 +1,47 @@
+import pprint
+
 import gym
 import gym_minigrid
 
 import numpy as np
 
 from ray import tune
-from ray.rllib.utils.exploration import Curiosity
-from ray.tune.integration.wandb import WandbLoggerCallback
 from collections import deque
 
-from jss_utils.PATHS import WANDB_API_KEY_FILE_PATH
+from jss_rl.rllib.ec import EpisodicCuriosity
+from jss_utils.jss_logger import log
 
+from ray.rllib.agents import DefaultCallbacks
 from ray.rllib.agents.ppo import ppo
 from ray.rllib.utils.numpy import one_hot
 from ray.tune import register_env
+from ray.rllib.utils.test_utils import check_learning_achieved, framework_iterator
+
+
+class MyCallBack(DefaultCallbacks):
+    def __init__(self):
+        super().__init__()
+        self.deltas = []
+
+    def on_postprocess_trajectory(
+            self,
+            *,
+            worker,
+            episode,
+            agent_id,
+            policy_id,
+            policies,
+            postprocessed_batch,
+            original_batches,
+            **kwargs
+    ):
+        pos = np.argmax(postprocessed_batch["obs"], -1)
+        x, y = pos % 8, pos // 8
+        self.deltas.extend((x ** 2 + y ** 2) ** 0.5)
+
+    def on_sample_end(self, *, worker, samples, **kwargs):
+        print(f"mean. distance from origin={np.mean(self.deltas):.4}")
+        self.deltas = []
 
 
 class OneHotWrapper(gym.core.ObservationWrapper):
@@ -50,6 +79,9 @@ class OneHotWrapper(gym.core.ObservationWrapper):
                         )
                     )
                     self.x_y_delta_buffer.append(max_diff)
+                    print(
+                        f"100-average dist travelled={np.mean(self.x_y_delta_buffer):.4}"
+                    )
                     self.x_positions = []
                     self.y_positions = []
                 self.init_x = self.agent_pos[0]
@@ -97,8 +129,70 @@ def env_maker(config):
 register_env("mini-grid", env_maker)
 
 
-def main():
-    project = "minigrid-ray"
+def test_curiosity_on_frozen_lake():
+    log.info("episodic curiosity with ppo algorithm on 'FrozenLake-v1' enviorment")
+    config = ppo.DEFAULT_CONFIG.copy()
+    # A very large frozen-lake that's hard for a random policy to solve
+    # due to 0.0 feedback.
+    config["env"] = "FrozenLake-v1"
+    config["env_config"] = {
+        "desc": [
+            "SFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFF",
+            "FFFFFFFG",
+        ],
+        "is_slippery": False,
+    }
+    # Print out observations to see how far we already get inside the Env.
+    config["callbacks"] = MyCallBack
+    # Limit horizon to make it really hard for non-curious agent to reach
+    # the goal state.
+    config["horizon"] = 16
+    # Local only.
+    config["num_workers"] = 0
+    config["lr"] = 0.001
+    config["framework"] = "torch"
+
+    config["exploration_config"] = {
+        "type": EpisodicCuriosity,
+        "framework": "torch",
+        # For the feature NN, use a non-LSTM fcnet (same as the one
+        # in the policy model).
+        "alpha": 1.0,
+        "beta": 1.0,
+        "embedding_dim": 64,
+        "episodic_memory_capacity": 8,
+
+        "sub_exploration": {
+            "type": "StochasticSampling",
+        },
+    }
+
+    print(pprint.pformat(config))
+    trainer_with_icm = ppo.PPOTrainer(config=config)
+
+    num_iterations = 10
+    learnt = False
+    log.info("evaluating performance with icm")
+    for i in range(num_iterations):
+        result = trainer_with_icm.train()
+        # log.info(pprint.pformat(result))
+        if result["episode_reward_max"] > 0.0:
+            log.info(f"reached goal after {i} iters!")
+            learnt = True
+            break
+    trainer_with_icm.stop()
+
+    log.info(f"the iteration limit was {num_iterations}. Goal reached: {learnt}")
+
+
+def test_curiosity_on_partially_observable_domain():
+    log.info("episodic curiosity with ppo algorithm on 'mini-grid' enviorment")
     config = ppo.DEFAULT_CONFIG.copy()
     config["env"] = "mini-grid"
     config["env_config"] = {
@@ -115,43 +209,17 @@ def main():
     config["num_sgd_iter"] = 8
     config["num_workers"] = 0
 
-    no_icm_config = config.copy()
-
-    min_reward = 0.001
-    num_samples = 20
-    stop = {
-        "training_iteration": 25,
-        "episode_reward_mean": min_reward,
-    }
-
-    tune.run(
-        "PPO",
-        checkpoint_freq=1,
-        config=no_icm_config,
-        stop=stop,
-        num_samples=num_samples,
-        callbacks=[
-            WandbLoggerCallback(
-                project=project,
-                log_config=False,
-                group="PPO",
-                api_key_file=WANDB_API_KEY_FILE_PATH)
-        ]
-    )
-
-    icm_config = config.copy()
-
-    icm_config["exploration_config"] = {
-        "type": Curiosity,
+    config["exploration_config"] = {
+        "type": EpisodicCuriosity,
         "framework": "torch",
         # For the feature NN, use a non-LSTM fcnet (same as the one
         # in the policy model).
-        "eta": 0.1,
-        "lr": 0.0003,  # 0.0003 or 0.0005 seem to work fine as well.
-        "feature_dim": 64,
-        # No actual feature net: map directly from observations to feature
-        # vector (linearly).
-        "feature_net_config": {
+        "alpha": 0.1,
+        "beta": 1.0,
+        "lr": 0.0005,  # 0.0003 or 0.0005 seem to work fine as well.
+        "embedding_dim": 64,
+        "episodic_memory_capacity": 50,
+        "embedding_net_config": {
             "fcnet_hiddens": [],
             "fcnet_activation": "relu",
         },
@@ -160,21 +228,23 @@ def main():
         },
     }
 
-    tune.run(
-        "PPO",
-        checkpoint_freq=1,
-        config=icm_config,
-        stop=stop,
-        num_samples=num_samples,
-        callbacks=[
-            WandbLoggerCallback(
-                project=project,
-                log_config=False,
-                group="PPO + ICM (tuned)",
-                api_key_file=WANDB_API_KEY_FILE_PATH)
-        ]
-    )
+    min_reward = 0.001
+    stop = {
+        "training_iteration": 25,
+        "episode_reward_mean": min_reward,
+    }
+    for _ in framework_iterator(config, frameworks="torch"):
+        results = tune.run("PPO", config=config, stop=stop, verbose=1)
+        try:
+            check_learning_achieved(results, min_reward)
+            iters = results.trials[0].last_result["training_iteration"]
+            log.info(f"reached in {iters} iterations.")
+        except ValueError:  # catch `stop-reward` of <...> not reached!` from check_learning_achieved
+            log.info(f"reward not reached.")
+
+    log.info(f"the training_iteration limit was {stop['training_iteration']}")
 
 
 if __name__ == '__main__':
-    main()
+    test_curiosity_on_frozen_lake()
+    # test_curiosity_on_partially_observable_domain()

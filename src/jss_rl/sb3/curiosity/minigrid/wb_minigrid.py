@@ -18,7 +18,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from wandb.integration.sb3 import WandbCallback
 
 from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
-from jss_rl.sb3.curiosity.icm2 import IntrinsicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.ec import EpisodicCuriosityModuleWrapper
+from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
 from jss_utils import PATHS
 
 
@@ -134,7 +135,8 @@ class MinigridLoggerCallBack(BaseCallback):
             "inverse_loss",
             "forward_loss",
 
-            "100-average dist travelled"
+            "100-average dist travelled",
+            "memory_size"
         ]
 
     def _get_vals(self, field: str) -> List:
@@ -200,6 +202,7 @@ def main(num_samples=5):
     }
 
     for _ in track(range(num_samples), description="running experiments with plain PPO"):
+        break
         run = wb.init(
             project=project,
             group="PPO",
@@ -246,7 +249,8 @@ def main(num_samples=5):
 
         run.finish()
 
-    for _ in track(range(num_samples), description="running experiments with plain PPO + ICM (default)"):
+    for _ in track(range(num_samples), description="running experiments with plain PPO + ICM"):
+        break
         icm_config = config.copy()
 
         icm_config["IntrinsicCuriosityModuleWrapper"] = {
@@ -319,6 +323,64 @@ def main(num_samples=5):
 
         run.finish()
 
+    for _ in track(range(num_samples), description="running experiments with plain PPO + EC"):
+        ec_config = config.copy()
+
+        ec_config["EpisodicCuriosityModuleWrapper"] = {
+            "alpha": 0.1,
+            "beta": 0.5,
+            "lr": 1e-3,
+            "gamma": 2,
+            "ec_capacity": 20,
+        }
+
+        run = wb.init(
+            project=project,
+            group="PPO + EC",
+            config=ec_config,
+            sync_tensorboard=True,
+            monitor_gym=True,  # auto-upload the videos of agents playing the game
+            save_code=True,  # optional
+            dir=f"{PATHS.WANDB_PATH}/",
+        )
+
+        venv = DummyVecEnv([
+            lambda: env_maker(
+                config=ec_config["env_config"],
+                wrapper_class=ec_config["wrapper_class"],
+                wrapper_kwargs=ec_config["wrapper_kwargs"])
+        ])
+
+        venv = EpisodicCuriosityModuleWrapper(
+            venv=venv,
+            **ec_config["EpisodicCuriosityModuleWrapper"]
+        )
+
+        venv = VecMonitor(venv=venv)
+
+        model = sb3.PPO(
+            "MlpPolicy",
+            env=venv,
+            verbose=1,
+            tensorboard_log=PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}"),
+            **ec_config["model_hyper_parameters"]
+        )
+
+        wb_cb = WandbCallback(
+            gradient_save_freq=100,
+            model_save_path=PATHS.WANDB_PATH.joinpath(f"{run.name}_{run.id}"),
+            verbose=1,
+        )
+
+        logger_cb = MinigridLoggerCallBack()
+
+        model.learn(
+            total_timesteps=ec_config["total_timesteps"],
+            callback=[wb_cb, logger_cb]
+        )
+
+        run.finish()
+
 
 if __name__ == '__main__':
-    main(num_samples=5)
+    main(num_samples=10)
