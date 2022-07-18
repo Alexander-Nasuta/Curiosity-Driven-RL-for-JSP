@@ -1,5 +1,3 @@
-import sys
-
 import gym
 import numpy as np
 import networkx as nx
@@ -621,7 +619,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
                         "finish_time": ft,
                         "node_id": task_id,
                         "valid_action": True,
-                        "scheduling_method": 'left_shift'
+                        "scheduling_method": 'left_shift',
+                        "left_shift": 1,
                     }
                 else:
                     return self._append_at_the_end(task_id=task_id, node=node, prev_job_node=prev_job_node, m_id=m_id)
@@ -661,7 +660,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
             "finish_time": ft,
             "node_id": task_id,
             "valid_action": True,
-            "scheduling_method": '_append_at_the_end'
+            "scheduling_method": '_append_at_the_end',
+            "left_shift": 0,
         }
 
     def _insert_at_index_0(self, task_id: int, node: dict, prev_job_node: dict, m_id: int) -> dict:
@@ -686,7 +686,8 @@ class DisjunctiveGraphJssEnv(gym.Env):
             "finish_time": ft,
             "node_id": task_id,
             "valid_action": True,
-            "scheduling_method": '_insert_at_index_0'
+            "scheduling_method": '_insert_at_index_0',
+            "left_shift": 0,
         }
 
     def _state_array(self) -> np.ndarray:
@@ -877,7 +878,7 @@ class DisjunctiveGraphJssEnv(gym.Env):
 
             if True not in mask:
                 if self.verbose >= 1:
-                    log.warning(f"no action options remaining")
+                    log.warning("no action options remaining")
                 if not self.env_transform == 'mask':
                     raise RuntimeError("something went wrong")  # todo: remove error?
             return mask
