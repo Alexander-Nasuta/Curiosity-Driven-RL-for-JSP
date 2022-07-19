@@ -72,7 +72,7 @@ def download_instances(start_id: int = 1, end_id: int = 243, format: str = None,
         log.info(f"processing instances in {jps_spec} specification")
 
         spec_dir = PATHS.JSP_INSTANCES_TAILLARD_PATH if jps_spec == "taillard" \
-            else PATHS.JSP_INSTANCES_STANDARD_SPEC_PATH
+            else PATHS.JSP_INSTANCES_STANDARD_PATH
 
         # create dir if not exists
         pl.Path(spec_dir).mkdir(parents=True, exist_ok=True)

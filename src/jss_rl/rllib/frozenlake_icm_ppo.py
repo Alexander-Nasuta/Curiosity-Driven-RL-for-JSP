@@ -1,27 +1,13 @@
-import sys
 from typing import Dict
 
 import numpy as np
-import wandb
-
-from ray import tune
-from ray.rllib import RolloutWorker, BaseEnv, Policy
+from ray.rllib import Policy, BaseEnv
 from ray.rllib.agents import DefaultCallbacks
-from ray.rllib.agents.ppo import ppo
-from ray.rllib.agents.ppo import PPOTrainer
 from ray.rllib.evaluation import Episode
-from ray.rllib.utils.exploration import Curiosity
 from ray.rllib.utils.typing import PolicyID
-from ray.tune.logger import DEFAULT_LOGGERS
-from ray.tune.integration.wandb import WandbLogger, wandb_mixin
-from ray.tune.integration.wandb import WandbLoggerCallback
 
-from jss_utils.PATHS import WANDB_API_KEY_FILE_PATH
-import jss_utils.jsp_instance_parser as parser
-import jss_utils.jsp_instance_details as details
-from jss_graph_env.disjunctive_graph_jss_env import DisjunctiveGraphJssEnv
-
-from ray.tune import register_env
+from jss_utils.jss_logger import log
+from ray.rllib.agents.ppo import ppo
 
 
 class MeanDistanceCallBack(DefaultCallbacks):
@@ -77,9 +63,37 @@ class MeanDistanceCallBack(DefaultCallbacks):
         pass
 
 
-def main():
-    project = "frozenlake-ray"
+class FrozenlakeCallBack(DefaultCallbacks):
+    def __init__(self):
+        super().__init__()
+        self.deltas = []
+
+    def on_postprocess_trajectory(
+            self,
+            *,
+            worker,
+            episode,
+            agent_id,
+            policy_id,
+            policies,
+            postprocessed_batch,
+            original_batches,
+            **kwargs
+    ):
+        pos = np.argmax(postprocessed_batch["obs"], -1)
+        x, y = pos % 8, pos // 8
+        self.deltas.extend((x ** 2 + y ** 2) ** 0.5)
+
+    def on_sample_end(self, *, worker, samples, **kwargs):
+        print(f"mean. distance from origin={np.mean(self.deltas):.4}")
+        self.deltas = []
+
+
+def run_icm_on_frozenlake():
+    log.info("comparing icm performance with ppo algorithm on 'FrozenLake-v1' enviorment")
     config = ppo.DEFAULT_CONFIG.copy()
+    # A very large frozen-lake that's hard for a random policy to solve
+    # due to 0.0 feedback.
     config["env"] = "FrozenLake-v1"
     config["env_config"] = {
         "desc": [
@@ -94,9 +108,8 @@ def main():
         ],
         "is_slippery": False,
     }
-
     # Print out observations to see how far we already get inside the Env.
-    #config["callbacks"] = MeanDistanceCallBack
+    config["callbacks"] = FrozenlakeCallBack
     # Limit horizon to make it really hard for non-curious agent to reach
     # the goal state.
     config["horizon"] = 16
@@ -104,64 +117,45 @@ def main():
     config["num_workers"] = 0
     config["lr"] = 0.001
     config["framework"] = "torch"
-    config["callbacks"] = MeanDistanceCallBack
 
-    no_icm_cofig = config.copy()
-
-    num_samples = 10
-    stop = {
-            "training_iteration": 10,
-            # "timesteps_total": 10_000,
-            # "episode_reward_mean": sys.float_info.epsilon,
-            "episode_reward_max": 1
-    }
-
-    tune.run(
-        "PPO",
-        checkpoint_freq=1,
-        config=no_icm_cofig,
-        stop=stop,
-        num_samples=num_samples,
-        callbacks=[
-            WandbLoggerCallback(
-                project=project,
-                log_config=False,
-                group="PPO",
-                api_key_file=WANDB_API_KEY_FILE_PATH)
-        ]
-    )
-
-
-    icm_config = config.copy()
-    icm_config["exploration_config"] = {
-        "type": "Curiosity",
-        "eta": 0.2,
-        "lr": 0.001,
-        "feature_dim": 128,
+    config["exploration_config"] = {
+        "type": "Curiosity",  # <- Use the Curiosity module for exploring.
+        "framework": "torch",
+        "eta": 1.0,  # Weight for intrinsic rewards before being added to extrinsic ones.
+        "lr": 0.001,  # Learning rate of the curiosity (ICM) module.
+        "feature_dim": 288,  # Dimensionality of the generated feature vectors.
+        # Setup of the feature net (used to encode observations into feature (latent) vectors).
         "feature_net_config": {
             "fcnet_hiddens": [],
             "fcnet_activation": "relu",
         },
+        "inverse_net_hiddens": [256],  # Hidden layers of the "inverse" model.
+        "inverse_net_activation": "relu",  # Activation of the "inverse" model.
+        "forward_net_hiddens": [256],  # Hidden layers of the "forward" model.
+        "forward_net_activation": "relu",  # Activation of the "forward" model.
+        "beta": 0.2,  # Weight for the "forward" loss (beta) over the "inverse" loss (1.0 - beta).
+        # Specify, which exploration sub-type to use (usually, the algo's "default"
+        # exploration, e.g. EpsilonGreedy for DQN, StochasticSampling for PG/SAC).
         "sub_exploration": {
             "type": "StochasticSampling",
-        },
+        }
     }
+    config["callbacks"] = MeanDistanceCallBack
 
-    tune.run(
-        "PPO",
-        checkpoint_freq=1,
-        config=icm_config,
-        stop=stop,
-        num_samples=num_samples,
-        callbacks=[
-            WandbLoggerCallback(
-                project=project,
-                log_config=False,
-                group="PPO + ICM (tuned)",
-                api_key_file=WANDB_API_KEY_FILE_PATH)
-        ]
-    )
+    trainer_with_icm = ppo.PPOTrainer(config=config)
+
+    num_iterations = 10
+    learnt = False
+    for i in range(num_iterations):
+        result = trainer_with_icm.train()
+        if result["episode_reward_max"] > 0.0:
+            log.info(f"reached goal after {i} iters!")
+            learnt = True
+            break
+    trainer_with_icm.stop()
+
+    assert learnt
 
 
 if __name__ == '__main__':
-    main()
+    run_icm_on_frozenlake()

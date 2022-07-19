@@ -112,7 +112,6 @@ class FrozenlakeLoggerCallBack(BaseCallback):
 
         # note num_timesteps increments always in num_envs (here 8)
         if self.num_timesteps and self.num_timesteps % 10_000 == 0:
-            print(f"len envo: {self.temp_trajectories[0]}")
             tab = self.wandb_ref.Table(
                 columns=[" ", *[f"step_{i}" for i in range(len(self.temp_trajectories[0]))]],
                 data=[
@@ -353,7 +352,8 @@ def main(num_samples=1):
             "gamma": 2,
             "embedding_dim": 64,
             "episodic_memory_capacity": 8,
-            "clear_memory_every_episode": True
+            "clear_memory_every_episode": True,
+            "exploration_steps": 20_000,
         }
 
         run = wb.init(

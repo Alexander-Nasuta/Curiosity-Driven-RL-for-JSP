@@ -37,6 +37,7 @@ class EpisodicCuriosityModuleWrapper(VecEnvWrapper):
                  b_novelty: float = 0.0,
                  episodic_memory_capacity: int = 100,
                  clear_memory_every_episode: bool = True,
+                 exploration_steps: int = None
                  ):
         VecEnvWrapper.__init__(self, venv=venv)
 
@@ -88,6 +89,7 @@ class EpisodicCuriosityModuleWrapper(VecEnvWrapper):
         self.gamma = gamma
         self.b_novelty = b_novelty
         self.clear_memory_every_episode = clear_memory_every_episode
+        self.exploration_steps = exploration_steps
 
         # bₙₒᵥₑₗₜᵧ
         # `After the bonus computation, the observation embedding is added to memory if the bonus b is larger
@@ -201,6 +203,10 @@ class EpisodicCuriosityModuleWrapper(VecEnvWrapper):
 
         return observations
 
+    def step_async(self, actions: np.ndarray) -> None:
+        self._num_timesteps += self.venv.num_envs  # one step per env
+        self.venv.step_async(actions)
+
     def step_wait(self) -> VecEnvStepReturn:
         """Overrides VecEnvWrapper.step_wait."""
         observations, rewards, dones, infos = self.venv.step_wait()
@@ -214,6 +220,17 @@ class EpisodicCuriosityModuleWrapper(VecEnvWrapper):
 
         # compare current observations with the ones in memory
         reward_bonus = np.zeros(self.venv.num_envs)
+
+        # return if all exploration steps are done
+        if self.exploration_steps is not None and self._num_timesteps > self.exploration_steps:
+            extended_infos = self._extend_infos(
+                augmented_rewards=rewards,
+                original_rewards=rewards,
+                intrinsic_rewards=reward_bonus,
+                dones=dones,
+                infos=infos,
+            )
+            return original_obs, rewards, dones, extended_infos
 
         # calc boni
         for env_i, single_obs in enumerate(observations):

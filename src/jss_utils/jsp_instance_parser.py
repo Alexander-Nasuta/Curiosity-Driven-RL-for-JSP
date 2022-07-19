@@ -184,7 +184,7 @@ def get_instance_by_name(name: str, /) -> np.ndarray:
 
 
 if __name__ == '__main__':
-    abz7_std_path = PATHS.JSP_INSTANCES_STANDARD_SPEC_PATH.joinpath("ft06.txt")
+    abz7_std_path = PATHS.JSP_INSTANCES_STANDARD_PATH.joinpath("ft06.txt")
     abz7_ta_path = PATHS.JSP_INSTANCES_TAILLARD_PATH.joinpath("ft06.txt")
 
     jps_instance_from_std, std_matrix = parse_jps_standard_specification(abz7_std_path)

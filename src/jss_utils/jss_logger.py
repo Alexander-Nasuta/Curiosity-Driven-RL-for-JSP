@@ -3,7 +3,6 @@ import shutil
 
 from rich.logging import RichHandler
 
-import jss_utils.PATHS as PATHS
 from jss_utils.banner import big_banner, small_banner
 
 # print banner when logger is imported
@@ -27,6 +26,5 @@ log = logging.getLogger("rich")
 # log.addHandler(fh)
 
 if __name__ == '__main__':
-    log.info("asd")
-    pass
+    log.info("fancy")
 

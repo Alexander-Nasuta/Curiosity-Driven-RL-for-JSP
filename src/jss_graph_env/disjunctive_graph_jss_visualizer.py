@@ -115,8 +115,7 @@ class DisjunctiveGraphJspVisualizer:
         w, h = shutil.get_terminal_size((80, 20))  # enable emulate output in terminal ...
 
         if len(df) > 0:
-            machines = df['Resource'].unique()
-            machines.sort()
+            machines = sorted(df['Resource'].unique())
             jobs = df['Task'].unique()
             jobs.sort()
         else:
@@ -131,8 +130,8 @@ class DisjunctiveGraphJspVisualizer:
             log.warn("terminal window to small")
             return
 
-        x_axis_tick_small = f"╤════"
-        x_axis_tick_big = f"╦════"
+        x_axis_tick_small = "╤════"
+        x_axis_tick_big = "╦════"
         len_tick = len(x_axis_tick_big)
         num_hole_ticks = x_pixels // len_tick
         len_last_tick = x_pixels % len_tick
@@ -167,7 +166,7 @@ class DisjunctiveGraphJspVisualizer:
                     chart_str = [
                         f"{DisjunctiveGraphJspVisualizer.rgb_color_sequence(*colors[resource])}█"
                         if not isinstance(v, str)
-                           and start <= v <= finish
+                        and start <= v <= finish
                         else v for v in chart_str
                     ]
                 prefix = f"{f'{j}':<{len_prefix - 1}}║" if j else f"{'':<{len_prefix - 1}}║"
@@ -359,7 +358,7 @@ class DisjunctiveGraphJspVisualizer:
         # Gantt chart
         width, height = fig.canvas.get_width_height()
         if not len(df):
-            df = pd.DataFrame([{"Task": f"Job 0", "Start": 0, "Finish": 0, "Resource": "Machine 0"}])
+            df = pd.DataFrame([{"Task": "Job 0", "Start": 0, "Finish": 0, "Resource": "Machine 0"}])
         fig = ff.create_gantt(df=df, show_colorbar=True, index_col='Resource', group_tasks=True, colors=colors)
         fig.update_layout(xaxis_type='linear')
 

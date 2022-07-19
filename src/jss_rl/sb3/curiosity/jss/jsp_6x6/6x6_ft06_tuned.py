@@ -40,14 +40,16 @@ gym.envs.register(
 def main(num_runs: int = 10):
     PROJECT = "6x6_fto6_tuned_dev"
     BENCHMARK_INSTANCE_NAME = "ft06"
+    EXPERIMENT = "6x6_tuned"
 
     jsp_instance, jsp_instance_details = env_utils.get_benchmark_instance_and_details(name="ft06")
 
     _, n_jobs, n_machines = jsp_instance.shape
 
-    wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
-
     RUN_CONFIG = {
+        "project": PROJECT,
+        "experiment": EXPERIMENT,
+
         "total_timesteps": 100_000,
         "n_envs": 8,  # multiprocessing.cpu_count()-1
 
@@ -81,8 +83,8 @@ def main(num_runs: int = 10):
         "env_name": "GraphJsp-v0",
         "env_kwargs": {
             "scale_reward": True,
-            "normalize_observation_space": True,
-            "flat_observation_space": True,
+            "normalize_observation_space": False,
+            "flat_observation_space": False,
             "perform_left_shift_if_possible": True,
             "default_visualisations": [
                 "gantt_window",

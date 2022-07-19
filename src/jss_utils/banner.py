@@ -1,7 +1,10 @@
 # flake8: noqa
 import os
 isRunningInPyCharm = "PYCHARM_HOSTED" in os.environ
-logname = os.environ['LOGNAME']
+try:
+    logname = os.environ['LOGNAME']
+except KeyError:
+    logname = "qwerty"
 
 
 LAST_UPDATED = "30.05.22"

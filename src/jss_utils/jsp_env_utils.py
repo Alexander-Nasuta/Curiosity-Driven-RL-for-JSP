@@ -12,6 +12,7 @@ from typing import Union
 from stable_baselines3.common.vec_env import VecEnv
 
 from jss_graph_env.disjunctive_graph_jss_env import DisjunctiveGraphJssEnv
+from jss_utils.jsp_instance_downloader import download_instances
 from jss_utils.jss_logger import log
 
 
@@ -88,4 +89,12 @@ def get_random_custom_instance_and_details_and_name(n_jobs: int, n_machines: int
 
 
 if __name__ == '__main__':
-    get_random_custom_instance_and_details_and_name(n_jobs=4, n_machines=4)
+    #get_random_custom_instance_and_details_and_name(n_jobs=4, n_machines=4)
+
+    download_instances(start_id=1, end_id=1)
+
+    abz5_ta_path = PATHS.JSP_INSTANCES_TAILLARD_PATH.joinpath("abz5.txt")
+
+    jsp_instance_from_ta, _ = parser.parse_jps_taillard_specification(abz5_ta_path)
+
+    instance, lb = get_benchmark_instance_and_lower_bound(name="abz5")

@@ -30,13 +30,13 @@ JSP_INSTANCES_DETAILS_PATH = RESOURCES_ROOT_PATH.joinpath("jps_instance_details"
 JPS_BENCHMARK_INSTANCES_DETAILS_FILE_PATH = JSP_INSTANCES_DETAILS_PATH.joinpath("benchmark_details.json")
 JPS_CUSTOM_INSTANCES_DETAILS_FILE_PATH = JSP_INSTANCES_DETAILS_PATH.joinpath("custom_instance_details.json")
 
-JSP_INSTANCES_STANDARD_SPEC_PATH = JSP_INSTANCES_PATH.joinpath("standard")
+JSP_INSTANCES_STANDARD_PATH = JSP_INSTANCES_PATH.joinpath("standard")
 JSP_INSTANCES_TAILLARD_PATH = JSP_INSTANCES_PATH.joinpath("taillard")
 JSP_INSTANCES_CUSTOM_PATH = JSP_INSTANCES_PATH.joinpath("custom")
 
 _deep_paths = [
     JSP_INSTANCES_DETAILS_PATH,
-    JSP_INSTANCES_STANDARD_SPEC_PATH,
+    JSP_INSTANCES_STANDARD_PATH,
     JSP_INSTANCES_TAILLARD_PATH,
     JSP_INSTANCES_CUSTOM_PATH,
     WANDB_PATH,
@@ -44,8 +44,13 @@ _deep_paths = [
     SB3_EXAMPLES_GIF
 ]
 
-for path in _deep_paths:
-    path.mkdir(parents=True, exist_ok=True)
+
+def setup_paths() -> None:
+    for path in _deep_paths:
+        path.mkdir(parents=True, exist_ok=True)
+
+
+setup_paths()
 
 
 def main() -> None:
@@ -58,7 +63,7 @@ def main() -> None:
         ┃   ┃   ┗━━ benchmark_details.json: {JPS_BENCHMARK_INSTANCES_DETAILS_FILE_PATH}
         ┃   ┣━━ jsp_instances: {JSP_INSTANCES_PATH}
         ┃   ┃   ┣━━ custom: {JSP_INSTANCES_CUSTOM_PATH}
-        ┃   ┃   ┣━━ standard: {JSP_INSTANCES_STANDARD_SPEC_PATH}
+        ┃   ┃   ┣━━ standard: {JSP_INSTANCES_STANDARD_PATH}
         ┃   ┃   ┗━━ taillard: {JSP_INSTANCES_TAILLARD_PATH}
         ┃   ┗━━ rl_output: {RL_OUTPUT_PATH}
         ┃       ┗━━ wandb: {WANDB_PATH}

@@ -1,5 +1,3 @@
-import numpy as np
-
 import jss_utils.jsp_env_utils as env_utils
 import jss_utils.jsp_or_tools_solver as or_tools_solver
 

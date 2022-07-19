@@ -718,12 +718,12 @@ class DisjunctiveGraphJssEnv(gym.Env):
             # merge arrays
             res = np.concatenate((adj, task_to_machine_mapping, task_to_duration_mapping), axis=1, dtype=self.dtype)
             """
-            
-            Example: 
-            
+
+            Example:
+
             normalize_observation_space = True
             (flat_observation_space = False)
-            
+
             jsp: (numpy array)
             [
                 # jobs order on machine
@@ -734,19 +734,19 @@ class DisjunctiveGraphJssEnv(gym.Env):
                 # task durations within a job
                 [
                     [17, 12, 19],   # task durations of job 0
-                    [8, 6, 2]       # task durations of job 1 
+                    [8, 6, 2]       # task durations of job 1
                 ]
-    
+
             ]
-            
+
             total number of tasks: 6 (2 * 3)
-            
+
             scaling/normalisation:
-                
+
                 longest_processing_time = 19 (third task of the first job)
-            
+
             initial observation:
-            
+
             ┏━━━━━━━━━┳━━━━━━━━┯━━━━━━━━┯━━━━━━┯━━━━━━━━┳━━━━━━━━━━━┯━━━━━━━━━━━┯━━━━━━━━━━━┳━━━━━━━━━━┓
             ┃         ┃ task_1 │ task_2 │ ...  │ task_6 ┃ machine_0 │ machine_1 │ machine_2 ┃ duration ┃
             ┣━━━━━━━━━╋━━━━━━━━┿━━━━━━━━┿━━━━━━┿━━━━━━━━╋━━━━━━━━━━━┿━━━━━━━━━━━┿━━━━━━━━━━━╋━━━━━━━━━━┫
@@ -758,9 +758,9 @@ class DisjunctiveGraphJssEnv(gym.Env):
             ┠─────────╂────────┼────────┼──────┼────────╂───────────┼───────────┼───────────╂──────────┨
             ┃ task_6  ┃  0.    │   0.   │  ... │  0.    ┃    0.     │    1.     │    0.     ┃     2/19 ┃
             ┗━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━┷━━━━━━━━┻━━━━━━━━━━━┷━━━━━━━━━━━┷━━━━━━━━━━━┻━━━━━━━━━━┛
-            
+
             or:
-            
+
             [
                 [0.        , 0.89473684,     ..., 0.        , 0.        , 1.        ,0.        , 0.89473684],
                 [0.        , 0.        ,     ..., 0.        , 0.        , 0.        ,1.        , 0.63157895],
@@ -770,11 +770,11 @@ class DisjunctiveGraphJssEnv(gym.Env):
             """
         else:
             """
-            Example: 
-            
+            Example:
+
             normalize_observation_space = False
             (flat_observation_space = False)
-            
+
             jsp: (numpy array)
             [
                 # jobs order on machine
@@ -785,15 +785,15 @@ class DisjunctiveGraphJssEnv(gym.Env):
                 # task durations within a job
                 [
                     [17, 12, 19],   # task durations of job 0
-                    [8, 6, 2]       # task durations of job 1 
+                    [8, 6, 2]       # task durations of job 1
                 ]
-    
+
             ]
-            
+
             total number of tasks: 6 (2 * 3)
-            
-            initial observation: 
-            
+
+            initial observation:
+
             ┏━━━━━━━━┳━━━━━━━━┯━━━━━━━━┯━━━━━┯━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
             ┃        ┃ task_1 │ task_2 │ ... │ task_3  ┃ machine ┃ duration ┃
             ┣━━━━━━━━╋━━━━━━━━┿━━━━━━━━┿━━━━━┿━━━━━━━━━╋━━━━━━━━━╋━━━━━━━━━━┫
@@ -805,9 +805,9 @@ class DisjunctiveGraphJssEnv(gym.Env):
             ┠────────╂────────┼────────┼─────┼─────────╂─────────╂──────────┨
             ┃ task_6 ┃     0. │     0. │ ... │      0. ┃      1. ┃       2. ┃
             ┗━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━┷━━━━━━━━━┻━━━━━━━━━┻━━━━━━━━━━┛
-            
-            or 
-            
+
+            or
+
             [
                 [ 0., 17.,  ...,  0.,  1., 17.],
                 [ 0.,  0.,  ...,  0.,  2., 12.],
