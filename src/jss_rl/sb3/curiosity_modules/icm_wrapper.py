@@ -67,7 +67,6 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.postprocess_on_end_of_episode = postprocess_on_end_of_episode
         self.postprocess_every_n_steps = postprocess_every_n_steps
 
-
         self.shuffle_samples = shuffle_samples
         self.maximum_sample_size = maximum_sample_size
 
@@ -214,7 +213,6 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
             extended_infos[i]["_num_timesteps"] = self.global_stats["_num_timesteps"]
             extended_infos[i]["memory_size"] = self.global_stats["memory_size"]
 
-
         return extended_infos
 
     def step_wait(self) -> VecEnvStepReturn:
@@ -303,7 +301,6 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
         # override previous observations
         self.prev_observations = observations
-
 
         extended_infos = self._extend_infos(
             augmented_rewards=augmented_rewards,
@@ -496,7 +493,6 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
 
     def reset(self) -> VecEnvObs:
         """Overrides VecEnvWrapper.reset."""
-        print("reset")
 
         observations = self.venv.reset()
         original_obs = observations
@@ -510,117 +506,3 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
         self.action_memory = [deque(maxlen=self.memory_capacity) for _ in range(self.venv.num_envs)]
 
         return original_obs
-
-
-if __name__ == '__main__':
-    from gym.wrappers import TimeLimit
-    from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
-    from stable_baselines3.common.vec_env import VecMonitor, VecEnvWrapper, DummyVecEnv
-    from stable_baselines3 import A2C, PPO
-
-    print("##### CartPole-v1 #####")
-    budget = 10_000
-    eval_episodes = 10
-    env_id = "CartPole-v1"
-
-    venv = make_vec_env_without_monitor(
-        env_id=env_id,
-        env_kwargs={},
-        n_envs=4
-    )
-    cartpole_venv = VecMonitor(venv=venv)
-    # model1 = A2C('MlpPolicy', cartpole_venv, verbose=0, seed=773)
-    # model1.learn(total_timesteps=budget)
-    # mean_reward, std_reward = evaluate_policy(model1, cartpole_venv, n_eval_episodes=eval_episodes)
-    # print(f"without icm: {mean_reward=}, {std_reward=}")
-    cartpole_venv.reset()
-    cartpole_icm_venv = IntrinsicCuriosityModuleWrapper(
-        venv=venv,
-    )
-
-    icm_model = PPO('MlpPolicy', cartpole_icm_venv, verbose=0)
-    icm_model.learn(total_timesteps=budget)
-
-    print("#### FrozenLake-v1 #####")
-
-    budget = 10_000
-    eval_episodes = 10
-
-    env_name = "FrozenLake-v1"
-    env_kwargs = {
-        "desc": [
-            "SFFFFFFF",
-            "FFFFFFFF",
-            "FFFFFFFF",
-            "FFFFFFFF",
-            "FFFFFFFF",
-            "FFFFFFFF",
-            "FFFFFFFF",
-            "FFFFFFFG",
-        ],
-        "is_slippery": False,
-    }
-
-    venv = make_vec_env_without_monitor(
-        env_id=env_name,
-        env_kwargs=env_kwargs,
-        wrapper_class=TimeLimit,
-        wrapper_kwargs={"max_episode_steps": 16},
-        n_envs=1
-    )
-
-
-    class DistanceWrapper(VecEnvWrapper):
-
-        def __init__(self, venv):
-            self.distances = MovingAverage(capacity=1000)
-            VecEnvWrapper.__init__(self, venv=venv)
-            self._steps = 0
-
-        def step_wait(self) -> VecEnvStepReturn:
-            """Overrides VecEnvWrapper.step_wait."""
-            observations, rewards, dones, infos = self.venv.step_wait()
-            self._steps += self.venv.num_envs
-
-            for i, o in enumerate(observations):
-                x, y = o % 8, o // 8  # frozen lake with 8x8 size
-                distance_from_origin = (x ** 2 + y ** 2) ** 0.5
-                self.distances.add(distance_from_origin)
-                print(f"[{self._steps}] distance_from_origin: {distance_from_origin:.4f},"
-                      f" moving avarage distance_from_origin: {self.distances.mean():.4f}")
-
-            return observations, rewards, dones, infos
-
-        def reset(self) -> VecEnvObs:
-            """Overrides VecEnvWrapper.reset."""
-            observations = self.venv.reset()
-            return observations
-
-
-    venv = DistanceWrapper(venv=venv)
-
-    # no_icm_venv = VecMonitor(venv=venv)
-    # no_icm_model = PPO('MlpPolicy', no_icm_venv, verbose=0)
-    # no_icm_model.learn(total_timesteps=budget)
-
-    icm_venv = IntrinsicCuriosityModuleWrapper(
-        venv=venv,
-        exploration_steps=int(0.5 * budget),
-        feature_net_hiddens=[],
-        forward_fcnet_net_hiddens=[256],
-        inverse_feature_net_hiddens=[256],
-
-        maximum_sample_size=16,
-
-        clear_memory_on_end_of_episode=True,
-        postprocess_on_end_of_episode=True,
-
-        clear_memory_every_n_steps=None,
-        postprocess_every_n_steps=None,
-    )
-    icm_venv = VecMonitor(venv=icm_venv)
-    icm_model = PPO('MlpPolicy', icm_venv, verbose=0)
-    icm_model.learn(total_timesteps=budget)
-
-    # mean_reward, std_reward = evaluate_policy(icm_model, icm_model.get_env(), n_eval_episodes=eval_episodes)
-    # print(f"with icm: {mean_reward=}, {std_reward=}")

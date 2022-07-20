@@ -157,10 +157,10 @@ def get_custom_instance_details(name: str) -> dict:
 
 
 if __name__ == '__main__':
-    #download_benchmark_instances_details()
-    #details = parse_instance_details()
+    download_benchmark_instances_details()
+    # details = parse_instance_details()
 
-    #log.info(f"EXAMPLE: details for ft06: {details['ft06']}")
+    # log.info(f"EXAMPLE: details for ft06: {details['ft06']}")
 
-    #update_custom_instance_details()
-    get_jps_instance_details("abz6")
+    # update_custom_instance_details()
+    # get_jps_instance_details("abz6")

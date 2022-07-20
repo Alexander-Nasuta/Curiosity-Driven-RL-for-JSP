@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 from collections import deque
 from types import ModuleType
@@ -16,15 +15,10 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecE
 from wandb.integration.sb3 import WandbCallback
 from statistics import mean
 
-from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
+from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWrapper
 from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
 from jss_rl.sb3.curiosity.ec import EpisodicCuriosityModuleWrapper
-from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
-    EpisodeEndMovingAverageRolloutEndLoggerCallback
-from jss_rl.sb3.util.callbacks.wb_info_logger_callback import WB_InfoLoggerCallback
-from jss_rl.sb3.util.info_field_moving_avarege_logger_callback import InfoFieldMovingAverageLogger
 from jss_utils import PATHS
-from jss_utils.jss_logger import log
 from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_rl.sb3.util.moving_avarage import MovingAverage
 

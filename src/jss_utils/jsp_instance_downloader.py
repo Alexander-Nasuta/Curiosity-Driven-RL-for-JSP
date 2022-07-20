@@ -139,4 +139,4 @@ def download_instances(start_id: int = 1, end_id: int = 243, format: str = None,
 
 
 if __name__ == '__main__':
-    download_instances()
+    download_instances(start_id=6, end_id=6)

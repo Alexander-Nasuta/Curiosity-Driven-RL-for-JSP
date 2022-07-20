@@ -1,5 +1,3 @@
-import sys
-
 import gym
 import imageio
 import sb3_contrib
@@ -9,6 +7,7 @@ import stable_baselines3 as sb3
 
 import jss_utils.PATHS as PATHS
 import jss_utils.jsp_env_utils as env_utils
+from jss_graph_env.disjunctive_graph_jss_env import DisjunctiveGraphJssEnv
 
 from jss_utils.jss_logger import log
 
@@ -16,21 +15,23 @@ from rich.progress import track
 from sb3_contrib.common.wrappers import ActionMasker
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 
-if __name__ == '__main__':
-    env = env_utils.get_pre_configured_example_env(
-        name="ft06",
+
+def train_and_create_gif(jsp_instance: np.ndarray, lower_bound: int,
+                         total_timesteps: int = 2_000, filename: str = "mask_ppo") -> None:
+    env = DisjunctiveGraphJssEnv(
+        jps_instance=jsp_instance,
         perform_left_shift_if_possible=True,
+        scaling_divisor=lower_bound,
         scale_reward=True,
         normalize_observation_space=True,
-        flat_observation_space=True
+        flat_observation_space=True,
+        action_mode='task',  # alternative 'job'
+        dtype='float32'
     )
-
     env = sb3.common.monitor.Monitor(env)
-
 
     def mask_fn(env: gym.Env) -> np.ndarray:
         return env.valid_action_mask()
-
 
     env = ActionMasker(env, mask_fn)
 
@@ -40,9 +41,9 @@ if __name__ == '__main__':
         verbose=1
     )
 
-    # Train the agent for 20 000 steps
+    # Train the agent
     log.info("training the model")
-    model.learn(total_timesteps=2_000)
+    model.learn(total_timesteps=total_timesteps)
 
     images = []
     obs = model.env.reset()
@@ -59,9 +60,14 @@ if __name__ == '__main__':
         images.append(img)
 
     imageio.mimsave(
-        PATHS.SB3_EXAMPLES_GIF.joinpath('mask_ppo.gif'),
+        PATHS.SB3_EXAMPLES_GIF.joinpath(f'{filename}.gif'),
         [np.array(img) for i, img in enumerate(images)],
         fps=10
     )
 
     log.info("done")
+
+
+if __name__ == '__main__':
+    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound(name="ft06")
+    train_and_create_gif(jsp_instance=jsp, lower_bound=lb)

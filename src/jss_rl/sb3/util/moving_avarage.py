@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class MovingAverage:
     """Computes the moving average of a variable."""
 

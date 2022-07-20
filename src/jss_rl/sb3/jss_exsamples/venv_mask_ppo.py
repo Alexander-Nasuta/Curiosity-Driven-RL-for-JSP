@@ -1,3 +1,5 @@
+from typing import Dict
+
 import sb3_contrib
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 
@@ -10,22 +12,8 @@ from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.env_util import make_vec_env
 
 
-if __name__ == '__main__':
-
-    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
-
-    env_kwargs = {
-        # placeholder for action and observation space shape
-        "jps_instance": jsp,
-        "scaling_divisor": lb,
-        "perform_left_shift_if_possible": True,
-        "scale_reward": True,
-        "normalize_observation_space": True,
-        "flat_observation_space": True
-    }
-
+def venv_basic_ppo_example(env_kwargs: Dict, total_timesteps=1_000, n_envs: int=4):
     log.info("setting up vectorised environment")
-
 
     def mask_fn(env):
         return env.valid_action_mask()
@@ -37,7 +25,7 @@ if __name__ == '__main__':
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
 
-        n_envs=4)
+        n_envs=n_envs)
 
     model = sb3_contrib.MaskablePPO(
         MaskableActorCriticPolicy,
@@ -45,4 +33,18 @@ if __name__ == '__main__':
         verbose=1,
     )
 
-    model.learn(total_timesteps=10_000)
+    model.learn(total_timesteps=total_timesteps)
+
+
+if __name__ == '__main__':
+    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
+    venv_basic_ppo_example(env_kwargs={
+        "jps_instance": jsp,
+        "scaling_divisor": lb,
+        "perform_left_shift_if_possible": True,
+        "scale_reward": True,
+        "normalize_observation_space": True,
+        "flat_observation_space": True
+    })
+
+

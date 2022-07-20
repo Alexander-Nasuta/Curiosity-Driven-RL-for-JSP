@@ -5,7 +5,6 @@ import wandb as wb
 
 from typing import Dict
 
-
 from ray import tune
 from ray.rllib.models import ModelCatalog
 from ray.rllib.agents.ppo import ppo
@@ -19,6 +18,7 @@ from jss_utils.PATHS import WANDB_API_KEY_FILE_PATH, WANDB_PATH
 from jss_utils.jsp_env_utils import get_benchmark_instance_and_details
 
 wb.tensorboard.patch(root_logdir=str(WANDB_PATH))
+
 
 def env_creator(env_config):
     return DisjunctiveGraphJssEnv(**env_config)  # return an env instance
@@ -56,9 +56,9 @@ def run_experiment(
     config["num_workers"] = 0
     config["framework"] = "torch"
     config["model"] = {
-            "custom_model": "jss_action_mask_model",  # action masking
-            "custom_model_config": {}
-        }
+        "custom_model": "jss_action_mask_model",  # action masking
+        "custom_model_config": {}
+    }
 
     plain_ppo_config = config.copy()
 

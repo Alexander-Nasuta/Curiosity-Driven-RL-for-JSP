@@ -4,7 +4,6 @@ import numpy as np
 from typing import Dict
 
 from ray import tune
-from ray.rllib.models import ModelCatalog
 from ray.tune import register_env
 from ray.rllib.agents.ppo import ppo, PPOTrainer
 

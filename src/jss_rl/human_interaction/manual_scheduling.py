@@ -6,7 +6,7 @@ import jss_utils.jsp_env_utils as env_utils
 
 if __name__ == '__main__':
 
-    env = env_utils.get_pre_configured_example_env()
+    env = env_utils.get_pre_configured_example_env(name="abz05")
 
     done = False
 

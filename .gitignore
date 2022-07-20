@@ -9,7 +9,8 @@ resources/logs/tensorboard_logs/
 resources/jps_instance_details/
 resources/rl_output/
 
-*/wandb/*
+*wandb/*
+src/jss_rl/rllib/wandb/*
 
 
 # C extensions

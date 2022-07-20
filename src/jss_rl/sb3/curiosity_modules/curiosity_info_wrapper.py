@@ -57,8 +57,6 @@ class CuriosityInfoWrapper(VecEnvWrapper):
             extended_infos[i]["n_postprocessings"] = self.global_stats["n_postprocessings"]
             extended_infos[i]["_num_timesteps"] = self.global_stats["_num_timesteps"]
 
-
-
         return observations, augmented_rewards, dones, extended_infos
 
     def step_async(self, actions: np.ndarray) -> None:
@@ -68,7 +66,6 @@ class CuriosityInfoWrapper(VecEnvWrapper):
     def __init__(self, venv: Union[VecEnvWrapper, VecEnv, DummyVecEnv]):
         VecEnvWrapper.__init__(self, venv=venv)
 
-        #
         self.n_postprocessings = 0
         self._num_timesteps = 0
 
@@ -82,34 +79,3 @@ class CuriosityInfoWrapper(VecEnvWrapper):
             "intrinsic_rewards": [],
             "n_sub_env_episodes": 0,
         } for _ in range(self.venv.num_envs)]
-
-
-
-if __name__ == '__main__':
-    from gym.wrappers import TimeLimit
-    from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
-    from stable_baselines3.common.vec_env import VecMonitor, VecEnvWrapper, DummyVecEnv
-    from stable_baselines3 import A2C, PPO
-
-    print("##### CartPole-v1 #####")
-    budget = 10_000
-    eval_episodes = 10
-    env_id = "CartPole-v1"
-
-    venv = make_vec_env_without_monitor(
-        env_id=env_id,
-        env_kwargs={},
-        n_envs=4
-    )
-    cartpole_venv = VecMonitor(venv=venv)
-    # model1 = A2C('MlpPolicy', cartpole_venv, verbose=0, seed=773)
-    # model1.learn(total_timesteps=budget)
-    # mean_reward, std_reward = evaluate_policy(model1, cartpole_venv, n_eval_episodes=eval_episodes)
-    # print(f"without icm: {mean_reward=}, {std_reward=}")
-    cartpole_venv.reset()
-    cartpole_venv = CuriosityInfoWrapper(
-        venv=venv,
-    )
-
-    icm_model = PPO('MlpPolicy', cartpole_venv, verbose=0)
-    icm_model.learn(total_timesteps=budget)

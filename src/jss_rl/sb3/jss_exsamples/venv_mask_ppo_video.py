@@ -1,4 +1,5 @@
 import sys
+from typing import Dict
 
 import numpy as np
 import sb3_contrib
@@ -15,25 +16,12 @@ from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.common.env_util import make_vec_env
 
-if __name__ == '__main__':
-    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
 
-    env_kwargs = {
-        # placeholder for action and observation space shape
-        "jps_instance": jsp,
-        "scaling_divisor": lb,
-        "perform_left_shift_if_possible": True,
-        "scale_reward": True,
-        "normalize_observation_space": True,
-        "flat_observation_space": True
-    }
-
+def venv_ppo_video_recorder_example(env_kwargs: Dict, total_timesteps=1_000, n_envs: int = 2):
     log.info("setting up vectorised environment")
-
 
     def mask_fn(env):
         return env.valid_action_mask()
-
 
     venv = make_vec_env(
         env_id=DisjunctiveGraphJssEnv,
@@ -42,15 +30,13 @@ if __name__ == '__main__':
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
 
-        n_envs=1)
+        n_envs=n_envs)
 
     model = sb3_contrib.MaskablePPO(
         MaskableActorCriticPolicy,
         env=venv,
         verbose=1,
     )
-
-    total_timesteps = 2_000
 
     model.learn(total_timesteps=total_timesteps)
 
@@ -78,3 +64,19 @@ if __name__ == '__main__':
     # for some reason there are no issues when deleting env manually
     del venv
     log.info("done.")
+
+
+if __name__ == '__main__':
+    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
+    venv_ppo_video_recorder_example(env_kwargs={
+        "jps_instance": jsp,
+        "scaling_divisor": lb,
+        "perform_left_shift_if_possible": True,
+        "scale_reward": True,
+        "normalize_observation_space": True,
+        "flat_observation_space": True,
+        "default_visualisations": [
+            "gantt_window",
+            "graph_window",  # very expensive
+        ],
+    })

@@ -1,5 +1,6 @@
 import time
 import datetime
+from typing import Dict
 
 import numpy as np
 import sb3_contrib
@@ -16,32 +17,12 @@ from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.vec_env import VecVideoRecorder
 from stable_baselines3.common.env_util import make_vec_env
 
-N_ENVS = 4
-VISUALISATIONS = [
-    "gantt_window",
-    "graph_window",  # very expensive
-]
 
-if __name__ == '__main__':
-    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
-
-    env_kwargs = {
-        # placeholder for action and observation space shape
-        "jps_instance": jsp,
-        "scaling_divisor": lb,
-        "perform_left_shift_if_possible": True,
-        "scale_reward": True,
-        "normalize_observation_space": True,
-        "flat_observation_space": True,
-        "default_visualisations": VISUALISATIONS
-    }
-
+def estimate_video_recording_costs(env_kwargs: Dict, video_len: int = 10, n_recorder_envs=4):
     log.info("setting up vectorised environment")
-
 
     def mask_fn(env):
         return env.valid_action_mask()
-
 
     venv = make_vec_env(
         env_id=DisjunctiveGraphJssEnv,
@@ -50,7 +31,7 @@ if __name__ == '__main__':
         wrapper_class=ActionMasker,
         wrapper_kwargs={"action_mask_fn": mask_fn},
 
-        n_envs=N_ENVS)
+        n_envs=n_recorder_envs)
 
     model = sb3_contrib.MaskablePPO(
         MaskableActorCriticPolicy,
@@ -58,12 +39,7 @@ if __name__ == '__main__':
         verbose=1,
     )
 
-    total_timesteps = 20_000
-
-    # model.learn(total_timesteps=total_timesteps)
-
     log.info("setting up video recorder")
-    video_len = 10
 
     venv = VecVideoRecorder(
         venv,
@@ -82,12 +58,31 @@ if __name__ == '__main__':
     end = time.perf_counter()
 
     recording_duration = end - start
-    log.info(f"recording duration: {recording_duration:2f} sec for {video_len} frames using {N_ENVS} environments")
-    for i in range(5, 101, 5):
-        dur = datetime.timedelta(seconds=int(i * recording_duration))
-        log.info(f"cost for {i * video_len:>4} frames: {dur}")
+    log.info(f"recording duration: {recording_duration:2f} sec for {video_len} frames using {n_recorder_envs} environments")
+    for num_envs in range(1, 11):
+        log.info("-"*17 + f" {num_envs} enviorments " + "-"*17)
+        for i in range(5, 101, 5):
+            dur = datetime.timedelta(seconds=int(i * recording_duration / n_recorder_envs * num_envs))
+            log.info(f"cost for {i * video_len:>4} frames with {num_envs} environments: {dur}")
 
     # somehow VecVideoRecorder crashes at the end of the script (when __del__() in VecVideoRecorder is called)
     # for some reason there are no issues when deleting env manually
     del venv
     log.info("done.")
+
+
+if __name__ == '__main__':
+    jsp, lb = env_utils.get_benchmark_instance_and_lower_bound("ft06")
+    VISUALISATIONS = [
+        "gantt_window",
+        "graph_window",  # very expensive
+    ]
+    estimate_video_recording_costs(env_kwargs={
+        "jps_instance": jsp,
+        "scaling_divisor": lb,
+        "perform_left_shift_if_possible": True,
+        "scale_reward": True,
+        "normalize_observation_space": True,
+        "flat_observation_space": True,
+        "default_visualisations": VISUALISATIONS
+    }, n_recorder_envs=4)
