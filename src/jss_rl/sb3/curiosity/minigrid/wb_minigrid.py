@@ -1,4 +1,3 @@
-import sys
 from collections import deque
 from statistics import mean
 from types import ModuleType
@@ -17,7 +16,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from wandb.integration.sb3 import WandbCallback
 
-from jss_rl.sb3.curiosity.curiosity_info_wrapper import CuriosityInfoWrapper
+from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWrapper
 from jss_rl.sb3.curiosity.ec import EpisodicCuriosityModuleWrapper
 from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
 from jss_utils import PATHS
