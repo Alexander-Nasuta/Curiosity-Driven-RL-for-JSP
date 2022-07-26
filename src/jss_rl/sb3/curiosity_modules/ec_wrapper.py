@@ -10,7 +10,7 @@ import numpy as np
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecEnv, VecEnvObs
 from stable_baselines3.common.vec_env import VecEnvWrapper, DummyVecEnv
 
-from jss_rl.sb3.util.torch_dense_sequential_model_builder import _create_fc_net
+from jss_rl.sb3.torch_dense_sequential_model_builder import _create_fc_net
 
 
 class EpisodicCuriosityModuleWrapper(VecEnvWrapper):

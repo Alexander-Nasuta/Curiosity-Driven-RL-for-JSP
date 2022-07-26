@@ -15,11 +15,11 @@ from stable_baselines3.common.vec_env import VecMonitor, VecVideoRecorder
 from wandb.integration.sb3 import WandbCallback
 
 from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWrapper
+from jss_rl.sb3.experiments.jss.jss_dynamic_instance_loader import DynamicCustomInstanceLoaderCallback
 from jss_rl.sb3.experiments.jss.jss_example_default_config import jss_default_config
 from jss_rl.sb3.experiments.jss.jss_logger_cb import JssLoggerCallback
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_utils.jss_logger import log
-
 
 gym.envs.register(
     id='GraphJsp-v0',
@@ -29,31 +29,31 @@ gym.envs.register(
 
 
 def run_jss_masked_ppo_dynamic_instance_example(total_timesteps: int = 100_000, *,
-                               jsp_instance: np.ndarray,
-                               jsp_instance_details: Dict,
-                               is_benchmark_instance: bool,
-                               project: str,
-                               instance_name: str = None,
-                               scaling_divisor: float = 1.0,
-                               group="PPO",
-                               additional_config: Dict = None) -> None:
+                                                n_machines: int,
+                                                n_jobs: int,
+                                                project: str,
+                                                load_instance_every_n_rollouts: int,
+                                                group="PPO",
+                                                additional_config: Dict = None) -> None:
     if additional_config is None:
         additional_config = {}
 
-    _, n_jobs, n_machines = jsp_instance.shape
+    jsp_instance, details, _ = env_utils.get_random_custom_instance_and_details_and_name(
+        n_jobs=n_jobs,
+        n_machines=n_machines
+    )
+
+    lb = details["lower_bound"]
 
     config = jss_default_config.copy()
     config = {
         **config,
         **additional_config,
 
-        "jsp_instance": jsp_instance,
-        "jsp_instance_details": jsp_instance_details,
-        "instance_name": instance_name,
-        "is_benchmark_instance": is_benchmark_instance,
+        "load_instance_every_n_rollouts": load_instance_every_n_rollouts,
+        "is_benchmark_instance": False,
         "n_jobs": n_jobs,
         "n_machines": n_machines,
-        "scaling_divisor": scaling_divisor,
 
         "total_timesteps": total_timesteps,
         "curiosity_module": "None",
@@ -75,23 +75,9 @@ def run_jss_masked_ppo_dynamic_instance_example(total_timesteps: int = 100_000, 
 
     log.info(f"run name: {run.name}, run id: {run.id}")
 
-    wb.log({
-        "tasks_to_machines_mapping": wb.Table(
-            data=jsp_instance[0],
-            columns=[f"task #{i}" for i in range(n_machines)]
-        )
-    })
-
-    wb.log({
-        "tasks_to_duration_mapping": wb.Table(
-            data=jsp_instance[1],
-            columns=[f"task #{i}" for i in range(n_machines)]
-        )
-    })
-
     env_kwargs = {
         "jps_instance": jsp_instance,
-        "scaling_divisor": config["scaling_divisor"],
+        "scaling_divisor": lb,
         **config["env_kwargs"]
     }
 
@@ -128,9 +114,14 @@ def run_jss_masked_ppo_dynamic_instance_example(total_timesteps: int = 100_000, 
         wandb_ref=wb
     )
 
+    dil_cb = DynamicCustomInstanceLoaderCallback(
+        load_instance_every_n_rollouts=load_instance_every_n_rollouts,
+        verbose=1,
+    )
+
     model.learn(
         total_timesteps=config["total_timesteps"],
-        callback=[wb_cb, logger_cb]
+        callback=[wb_cb, dil_cb, logger_cb]
     )
 
     log.info(f"setting up video recorder")
@@ -175,15 +166,10 @@ def run_jss_masked_ppo_dynamic_instance_example(total_timesteps: int = 100_000, 
 
 if __name__ == '__main__':
     wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
-
-    jsp_instance, jsp_instance_details = env_utils.get_benchmark_instance_and_details(name="ft06")
-
     run_jss_masked_ppo_dynamic_instance_example(
         project="test",
-        jsp_instance=jsp_instance,
-        jsp_instance_details=jsp_instance_details,
-        is_benchmark_instance=True,
-        scaling_divisor=jsp_instance_details["lower_bound"],
-        instance_name="ft06",
-        total_timesteps=50_000,
+        n_jobs=3,
+        n_machines=3,
+        load_instance_every_n_rollouts=1,
+        total_timesteps=150_000,
     )

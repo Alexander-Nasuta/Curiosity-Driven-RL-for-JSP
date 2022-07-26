@@ -17,7 +17,7 @@ from wandb.integration.sb3 import WandbCallback
 from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWrapper
 from jss_rl.sb3.experiments.jss.jss_example_default_config import jss_default_config
 from jss_rl.sb3.experiments.jss.jss_logger_cb import JssLoggerCallback
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_utils.jss_logger import log
 
 

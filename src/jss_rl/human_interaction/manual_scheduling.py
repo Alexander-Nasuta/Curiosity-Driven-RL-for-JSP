@@ -6,7 +6,7 @@ import jss_utils.jsp_env_utils as env_utils
 
 if __name__ == '__main__':
 
-    env = env_utils.get_pre_configured_example_env(name="abz05")
+    env = env_utils.get_pre_configured_example_env(name="ft06")
 
     done = False
 
@@ -31,5 +31,5 @@ if __name__ == '__main__':
 
     log.info("the JSP is completely scheduled.")
     log.info("press any key to close the window (while the window is focused).")
-    env.render(wait=None)  # wait for keyboard input before closing the render window
+    # env.render(wait=None)  # wait for keyboard input before closing the render window
     env.render(wait=5)

@@ -20,7 +20,7 @@ from stable_baselines3.common.vec_env import VecMonitor
 
 from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWrapper
 from jss_rl.sb3.curiosity.jss.jss_logger_callback import JssLoggerCallback
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
 from jss_utils.jss_logger import log
 
 wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
@@ -265,7 +265,7 @@ def perform_run():
     _, n_jobs, n_machines = jsp_instance.shape
 
     RUN_CONFIG = {
-        "total_timesteps": 100_000,
+        "total_timesteps": 10_000,
         "n_envs": 8,  # multiprocessing.cpu_count()-1
 
         "instance_name": instance_name,
@@ -487,16 +487,16 @@ def perform_run():
 
 
 if __name__ == '__main__':
-    # sweep_id = wb.sweep(SWEEP_CONFIG, project=PROJECT)
+    sweep_id = wb.sweep(SWEEP_CONFIG, project=PROJECT)
 
     # you can enter the sweep id that is returned by wb.sweep(...)
     # here and comment out the other line
-    sweep_id = "ax11ve1x"
+    #sweep_id = "ax11ve1x"
 
     log.info(f"use this 'sweep_id': '{sweep_id}'")
     wb.agent(
         sweep_id,
         function=perform_run,
-        count=300,
+        count=3,
         project=PROJECT
     )

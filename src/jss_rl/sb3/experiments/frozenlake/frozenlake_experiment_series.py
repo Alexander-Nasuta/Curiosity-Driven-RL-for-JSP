@@ -16,7 +16,7 @@ def run_experiment_series(total_timesteps: int, wb_project: str, num_runs_per_mo
     additional_config = {
         "series_id": name
     }
-    log.info(f"running an [cyan]experiment series[cyan] ('{name}') on 'FrozenLake-v1' environment.")
+    log.info(f"running an experiment series ('{name}') on 'FrozenLake-v1' environment.")
 
     with Progress() as progress:
         task1 = progress.add_task("[cyan]PPO", total=num_runs_per_module)

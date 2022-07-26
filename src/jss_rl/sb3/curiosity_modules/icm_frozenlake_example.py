@@ -4,8 +4,8 @@ from stable_baselines3.common.vec_env import VecMonitor
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvWrapper
 
 from jss_rl.sb3.curiosity_modules.icm_wrapper import IntrinsicCuriosityModuleWrapper
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
-from jss_rl.sb3.util.moving_avarage import MovingAverage
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.moving_avarage import MovingAverage
 
 
 class DistanceWrapper(VecEnvWrapper):

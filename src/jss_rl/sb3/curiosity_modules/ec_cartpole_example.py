@@ -1,7 +1,7 @@
 from jss_rl.sb3.curiosity_modules.ec_wrapper import EpisodicCuriosityModuleWrapper
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
-from stable_baselines3.common.vec_env import VecMonitor, VecEnvWrapper, DummyVecEnv
-from stable_baselines3 import A2C, PPO
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
+from stable_baselines3.common.vec_env import VecMonitor
+from stable_baselines3 import PPO
 
 
 def ec_cartpole_example(total_timesteps: int = 10_000, n_envs: int = 4) -> None:

@@ -21,8 +21,8 @@ from jss_rl.sb3.curiosity.icm_wrapper import IntrinsicCuriosityModuleWrapper
 from jss_rl.sb3.util.callbacks.episode_end_moving_average_rollout_end_logger_callback import \
     EpisodeEndMovingAverageRolloutEndLoggerCallback
 from jss_rl.sb3.util.info_field_moving_avarege_logger_callback import InfoFieldMovingAverageLogger
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
-from jss_rl.sb3.util.progress_bar_callback import ProgressBarCallback
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.progress_bar_callback import ProgressBarCallback
 
 from jss_utils.jss_logger import log
 

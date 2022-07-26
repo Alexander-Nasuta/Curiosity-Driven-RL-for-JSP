@@ -19,8 +19,8 @@ from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWra
 from jss_rl.sb3.curiosity.icm import IntrinsicCuriosityModuleWrapper
 from jss_rl.sb3.curiosity.ec import EpisodicCuriosityModuleWrapper
 from jss_utils import PATHS
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
-from jss_rl.sb3.util.moving_avarage import MovingAverage
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.moving_avarage import MovingAverage
 
 
 class DistanceWrapper(VecEnvWrapper):

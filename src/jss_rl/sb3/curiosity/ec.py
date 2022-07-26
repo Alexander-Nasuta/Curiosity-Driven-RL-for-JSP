@@ -1,22 +1,17 @@
-import itertools
-import sys
 from collections import deque
 from copy import copy
 
 import gym
 import torch
-import torch.nn as nn
 
-from typing import Union, List, Dict, Callable
+from typing import Union, List, Dict
 
 import numpy as np
-from ray.rllib.models.torch.misc import SlimFC
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecEnvWrapper, VecEnv, VecEnvObs
-from stable_baselines3.common.vec_env import VecEnvWrapper, DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecEnv, VecEnvObs
+from stable_baselines3.common.vec_env import VecEnvWrapper, DummyVecEnv
 
-from jss_rl.sb3.util.moving_avarage import MovingAverage
-from jss_rl.sb3.util.torch_dense_sequential_model_builder import _create_fc_net
-from torch.nn.functional import one_hot
+from jss_rl.sb3.moving_avarage import MovingAverage
+from jss_rl.sb3.torch_dense_sequential_model_builder import _create_fc_net
 
 
 class EpisodicCuriosityModuleWrapper(VecEnvWrapper):
@@ -399,9 +394,9 @@ class EpisodicCuriosityModuleWrapper(VecEnvWrapper):
 
 if __name__ == '__main__':
     from gym.wrappers import TimeLimit
-    from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
+    from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
     from stable_baselines3.common.vec_env import VecMonitor, VecEnvWrapper, DummyVecEnv
-    from stable_baselines3 import A2C, PPO
+    from stable_baselines3 import PPO
 
     print("##### CartPole-v1 #####")
     budget = 10_000

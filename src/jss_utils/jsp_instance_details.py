@@ -17,7 +17,7 @@ def download_benchmark_instances_details() -> None:
 
         http://jobshop.jjvh.nl
 
-    and save them in as in .json-format in the 'resources' directory.
+    and save them in as in .json-format in the './resources/jps_instance_details' directory.
 
     :return: None
     """

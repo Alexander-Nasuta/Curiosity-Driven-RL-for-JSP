@@ -1,8 +1,6 @@
-import sys
 from types import ModuleType
 
 import jss_utils.jsp_env_utils as env_utils
-import wandb as wb
 
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -20,7 +18,7 @@ class DynamicCustomInstanceLoaderCallback(BaseCallback):
 
     def _on_training_start(self) -> None:
         first_env = self.model.env.envs[0]
-        n_jobs = first_env.n_jobs 
+        n_jobs = first_env.n_jobs
         n_machines = first_env.n_machines
 
         jsp, details, name = env_utils.get_random_custom_instance_and_details_and_name(

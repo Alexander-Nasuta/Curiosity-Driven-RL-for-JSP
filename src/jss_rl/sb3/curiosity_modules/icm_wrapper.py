@@ -8,11 +8,10 @@ import torch
 from typing import Union, List, Dict
 
 import numpy as np
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecEnvWrapper, VecEnv, VecEnvObs
-from stable_baselines3.common.vec_env import VecEnvWrapper, DummyVecEnv, SubprocVecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnvStepReturn, VecEnv, VecEnvObs
+from stable_baselines3.common.vec_env import VecEnvWrapper, DummyVecEnv
 
-from jss_rl.sb3.util.moving_avarage import MovingAverage
-from jss_rl.sb3.util.torch_dense_sequential_model_builder import _create_fc_net
+from jss_rl.sb3.torch_dense_sequential_model_builder import _create_fc_net
 from torch.nn.functional import one_hot
 
 
@@ -36,11 +35,13 @@ class IntrinsicCuriosityModuleWrapper(VecEnvWrapper):
                  forward_fcnet_net_activation: str = "relu",
 
                  memory_capacity: int = 100,
-                 clear_memory_on_end_of_episode: bool = False,
-                 clear_memory_every_n_steps: int = None,
                  shuffle_samples: bool = True,
                  maximum_sample_size: int = None,
+
                  postprocess_on_end_of_episode: bool = True,
+                 clear_memory_on_end_of_episode: bool = False,
+
+                 clear_memory_every_n_steps: int = None,
                  postprocess_every_n_steps: int = None,
 
                  exploration_steps: int = None,

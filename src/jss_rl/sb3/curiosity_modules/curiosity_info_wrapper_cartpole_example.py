@@ -1,5 +1,5 @@
 from jss_rl.sb3.curiosity_modules.curiosity_info_wrapper import CuriosityInfoWrapper
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
 from stable_baselines3.common.vec_env import VecMonitor
 from stable_baselines3 import PPO
 

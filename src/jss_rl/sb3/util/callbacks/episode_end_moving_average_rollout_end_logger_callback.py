@@ -1,9 +1,9 @@
 from statistics import mean
-from typing import List, Callable
+from typing import List
 
 from stable_baselines3.common.callbacks import BaseCallback
 
-from jss_rl.sb3.util.moving_avarage import MovingAverage
+from jss_rl.sb3.moving_avarage import MovingAverage
 
 
 class EpisodeEndMovingAverageRolloutEndLoggerCallback(BaseCallback):

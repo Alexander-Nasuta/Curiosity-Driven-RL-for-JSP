@@ -11,7 +11,7 @@ from jss_rl.sb3.curiosity_modules.icm_wrapper import IntrinsicCuriosityModuleWra
 from jss_rl.sb3.experiments.frozenlake.frozenlake_default_config import frozenlake_default_config
 from jss_rl.sb3.experiments.frozenlake.frozenlake_distance_wrapper import DistanceWrapper
 from jss_rl.sb3.experiments.frozenlake.frozenlake_logger_cb import FrozenlakeLoggerCallBack
-from jss_rl.sb3.util.make_vec_env_without_monitor import make_vec_env_without_monitor
+from jss_rl.sb3.make_vec_env_without_monitor import make_vec_env_without_monitor
 
 
 def run_ppo_icm_frozenlake_experiment(total_timesteps: int, *, project: str, group="PPO + ICM",

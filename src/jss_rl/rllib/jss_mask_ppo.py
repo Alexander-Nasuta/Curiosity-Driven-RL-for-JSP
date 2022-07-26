@@ -12,9 +12,6 @@ from ray.tune import register_env
 
 from ray.rllib.agents.ppo import ppo, PPOTrainer
 from ray.rllib.models import ModelCatalog
-from ray.rllib.models.torch.torch_modelv2 import TorchModelV2
-from ray.rllib.models.torch.fcnet import FullyConnectedNetwork as TorchFC
-from ray.rllib.utils.torch_utils import FLOAT_MIN
 
 from jss_graph_env.disjunctive_graph_jss_env import DisjunctiveGraphJssEnv
 

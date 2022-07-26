@@ -74,7 +74,7 @@ def load_benchmark_instance_to_environment(env: Union[DisjunctiveGraphJssEnv, Ve
 def get_random_custom_instance_and_details_and_name(n_jobs: int, n_machines: int) -> (np.ndarray, dict, str):
     dir = PATHS.JSP_INSTANCES_CUSTOM_PATH.joinpath(f"{n_jobs}x{n_machines}")
 
-    if not dir.exists():
+    if not dir.exists() or not len(list(dir.glob('**/*'))):
         log.info(f"there are no custom instances of size ({n_jobs},{n_machines}) in the resource directory. "
                  f"Therefore some will be generated.")
         jsp_gen.generate_jsp_instances(n_jobs=n_jobs, n_machines=n_machines)

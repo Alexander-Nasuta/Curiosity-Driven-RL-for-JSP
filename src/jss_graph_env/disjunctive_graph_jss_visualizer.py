@@ -71,7 +71,7 @@ class DisjunctiveGraphJspVisualizer:
             return f(*[int(n * 255) for n in [r, g, b]])
 
     @staticmethod
-    def wrap_with_color_codes(s: object, /, r: Union[int, float], g: Union[int, float], b: Union[int, float], **kwargs) \
+    def wrap_with_color_codes(s: object, /, r: Union[int, float], g: Union[int, float], b: Union[int, float], **kwargs)\
             -> str:
         """
         stringify an object and wrap it with console color codes. It adds the color control sequence in front and one
@@ -343,8 +343,9 @@ class DisjunctiveGraphJspVisualizer:
             import numpy as np
 
             c_map = plt.cm.get_cmap("jet")  # select the desired cmap
-            arr = np.linspace(0, 1, 10)  # create a list with numbers from 0 to 1 with n items
+            arr = np.linspace(0, 1, 10)  # create a list with numbers from 0 to 1 with n items (n = 10 here)
             colors = {resource: c_map(val) for resource, val in enumerate(arr)}
+            <<pass `colors` as parameter>>
 
         """
 
