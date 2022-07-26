@@ -11,7 +11,7 @@ random_ppo_sweep_config = {
             'values': [None]
         },
         "total_timesteps": {
-            'values': [15_000]
+            'values': [75_000]
         },
         "n_envs": {
             'values': [8]
@@ -240,12 +240,12 @@ if __name__ == '__main__':
     from jss_rl.sb3.experiments.jss.jss_ppo_perform_sweep_run import perform_jss_run
 
     wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
-    sweep_id = wb.sweep(random_ppo_sweep_config, project="testo")
-    print(f"{sweep_id=}")
-    #sweep_id = "cpcvcb17"  # icm random sweep
+    # sweep_id = wb.sweep(random_ppo_sweep_config, project="testo")
+    # print(f"{sweep_id=}")
+    sweep_id = "66brc0d5"  # icm random sweep
     wb.agent(
         sweep_id,
         function=perform_jss_run,
-        count=3,
+        count=1,
         project="testo"
     )
