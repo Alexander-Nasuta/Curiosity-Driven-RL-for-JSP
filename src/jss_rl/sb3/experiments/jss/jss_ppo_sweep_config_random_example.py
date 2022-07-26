@@ -1,5 +1,13 @@
+import wandb as wb
+import jss_utils.PATHS as PATHS
+from jss_rl.sb3.experiments.jss.jss_ppo_perform_sweep_run import perform_jss_run
+from argparse import ArgumentParser
+from jss_utils.name_generator import generate_name
+
+
 random_ppo_sweep_config = {
     'method': 'random',
+    'name': generate_name(),
     'metric': {
         'name': 'mean_makespan',
         'goal': 'minimize'
@@ -28,7 +36,6 @@ random_ppo_sweep_config = {
         "n_jobs": {
             "values": [6]
         },
-
 
         # gamma: float = 0.99,
         # Discount factor
@@ -234,18 +241,48 @@ random_ppo_sweep_config = {
     }
 }
 
-if __name__ == '__main__':
-    import wandb as wb
-    import jss_utils.PATHS as PATHS
-    from jss_rl.sb3.experiments.jss.jss_ppo_perform_sweep_run import perform_jss_run
 
+def run_sweep(project: str, sweep_id: str = None, new_sweep: bool = False, count: int = None) -> None:
     wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
-    # sweep_id = wb.sweep(random_ppo_sweep_config, project="testo")
-    # print(f"{sweep_id=}")
-    sweep_id = "66brc0d5"  # icm random sweep
+    if not project:
+        raise ValueError("'project' must not be `None`!")
+    if sweep_id and new_sweep:
+        raise ValueError("'sweep_id' must be `None` if 'new_sweep' is `True`")
+    if new_sweep:
+        sweep_id = wb.sweep(random_ppo_sweep_config, project="testo")
+    if count is None:
+        raise ValueError("for sweeps with `method='random'` 'count' must be specified!")
     wb.agent(
         sweep_id,
         function=perform_jss_run,
-        count=1,
+        count=count,
         project="testo"
     )
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+
+    parser.add_argument("-p", "--project",
+                        dest="wandb-project",
+                        help="the wandb project to which the result will be logged",
+                        default="testo"
+                        )
+
+    parser.add_argument("-sid", "--sweep_id",
+                        dest="wandb-sweep-id",
+                        help="the id of an existing sweep in wandb. "
+                             "The performed runs will be logged to the specified sweep.",
+                        default=None
+                        )
+
+    parser.add_argument("-n", "--new",
+                        help="a new sweep will be created if set to `True`",
+                        default=False
+                        )
+
+    parser.add_argument("-c", "--count",
+                        dest="wandb-sweep-run-count",
+                        help="the number of runs that shall be performed",
+                        default=None
+                        )
