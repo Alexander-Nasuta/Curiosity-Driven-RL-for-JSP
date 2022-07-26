@@ -1,8 +1,10 @@
 import wandb as wb
 import jss_utils.PATHS as PATHS
+
 from jss_rl.sb3.experiments.jss.jss_ppo_perform_sweep_run import perform_jss_run
 from argparse import ArgumentParser
 from jss_utils.name_generator import generate_name
+from jss_utils.jss_logger import log
 
 
 random_ppo_sweep_config = {
@@ -250,6 +252,10 @@ def run_sweep(project: str, sweep_id: str = None, new_sweep: bool = False, count
         raise ValueError("'sweep_id' must be `None` if 'new_sweep' is `True`")
     if new_sweep:
         sweep_id = wb.sweep(random_ppo_sweep_config, project="testo")
+        if count is None:
+            log.info(f"your 'sweep_id' is `{sweep_id}`. rerun this script with the '-c'/'--count'-argument specified "
+                     f"to perform runs for the sweep.")
+            return
     if count is None:
         raise ValueError("for sweeps with `method='random'` 'count' must be specified!")
     wb.agent(
@@ -264,25 +270,33 @@ if __name__ == '__main__':
     parser = ArgumentParser()
 
     parser.add_argument("-p", "--project",
-                        dest="wandb-project",
+                        dest="project",
                         help="the wandb project to which the result will be logged",
                         default="testo"
                         )
 
     parser.add_argument("-sid", "--sweep_id",
-                        dest="wandb-sweep-id",
+                        dest="sweep_id",
                         help="the id of an existing sweep in wandb. "
                              "The performed runs will be logged to the specified sweep.",
                         default=None
                         )
 
     parser.add_argument("-n", "--new",
+                        dest="new_sweep",
+                        type=bool,
                         help="a new sweep will be created if set to `True`",
                         default=False
                         )
 
     parser.add_argument("-c", "--count",
-                        dest="wandb-sweep-run-count",
+                        dest="count",
+                        type=int,
                         help="the number of runs that shall be performed",
                         default=None
                         )
+
+    args = vars(parser.parse_args())
+    run_sweep(**args)
+
+
