@@ -272,7 +272,7 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--project",
                         dest="project",
                         help="the wandb project to which the result will be logged",
-                        default="testo"
+                        default="MA-nasuta"
                         )
 
     parser.add_argument("-sid", "--sweep_id",
