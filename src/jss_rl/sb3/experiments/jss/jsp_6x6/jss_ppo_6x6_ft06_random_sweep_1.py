@@ -7,7 +7,6 @@ from argparse import ArgumentParser
 from jss_utils.name_generator import generate_name
 from jss_utils.jss_logger import log
 
-
 random_ppo_sweep_config = {
     'method': 'random',
     'name': generate_name(),
@@ -44,7 +43,7 @@ random_ppo_sweep_config = {
         # Discount factor
         "gamma": {
             "distribution": "uniform",
-            "min": 0.99,
+            "min": 0.95,
             "max": 1,
         },
         # gae_lambda: float = 0.95,
@@ -222,7 +221,7 @@ random_ppo_sweep_config = {
 
         # env params
         "action_mode": {
-            'values': ['task']
+            'values': ['task', 'job']
         },
         "normalize_observation_space": {
             'values': [True]
@@ -231,7 +230,7 @@ random_ppo_sweep_config = {
             'values': [True]
         },
         "perform_left_shift_if_possible": {
-            'values': [True]
+            'values': [True, False]
         },
         "dtype": {
             'values': ["float32"]
@@ -312,5 +311,3 @@ if __name__ == '__main__':
         )
     else:
         run_sweep(**args)
-
-
