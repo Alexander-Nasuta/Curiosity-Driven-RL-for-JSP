@@ -252,7 +252,7 @@ def run_sweep(project: str, sweep_id: str = None, new_sweep: bool = False, count
     if sweep_id and new_sweep:
         raise ValueError("'sweep_id' must be `None` if 'new_sweep' is `True`")
     if new_sweep:
-        sweep_id = wb.sweep(random_ppo_sweep_config, project="testo")
+        sweep_id = wb.sweep(random_ppo_sweep_config, project=project)
         if count is None:
             log.info(f"your 'sweep_id' is `{sweep_id}`. rerun this script with the '-c'/'--count'-argument specified "
                      f"to perform runs for the sweep.")
