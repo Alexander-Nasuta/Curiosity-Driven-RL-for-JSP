@@ -263,7 +263,7 @@ def run_sweep(project: str, sweep_id: str = None, new_sweep: bool = False, count
         sweep_id,
         function=perform_jss_run,
         count=count,
-        project="testo"
+        project=project
     )
 
 
