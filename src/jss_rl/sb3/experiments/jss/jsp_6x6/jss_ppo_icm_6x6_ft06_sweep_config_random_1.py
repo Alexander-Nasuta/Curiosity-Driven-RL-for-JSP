@@ -1,30 +1,13 @@
-# non dynamic instance params from sweeps
+import wandb as wb
+import jss_utils.PATHS as PATHS
+from jss_rl.sb3.experiments.jss.cost_estimator import extrapolate_cost
+
+from jss_rl.sb3.experiments.jss.jss_ppo_perform_sweep_run import perform_jss_run
+from argparse import ArgumentParser
 from jss_utils.name_generator import generate_name
+from jss_utils.jss_logger import log
 
 tuning_results = {
-        # Constanst
-        "curiosity_module": {
-            'values': [None]
-        },
-        "total_timesteps": {
-            'values': [40_000]
-        },
-        "n_envs": {
-            'values': [8]
-        },
-        "benchmark_instance": {
-            'values': ["ft06"]
-        },
-        "dynamic_instances": {
-            'values': [False]
-        },
-        "n_machines": {
-            "values": [6]
-        },
-        "n_jobs": {
-            "values": [6]
-        },
-
         # gamma: float = 0.99,
         # Discount factor
         "gamma": {
@@ -33,7 +16,7 @@ tuning_results = {
         # gae_lambda: float = 0.95,
         # Factor for trade-off of bias vs variance for Generalized Advantage Estimator
         "gae_lambda": {
-            "values": [0.9, 0.95]
+            "values": [0.9]
         },
         # max_grad_norm: float = 0.5,
         # The maximum value for the gradient clipping
@@ -44,7 +27,7 @@ tuning_results = {
         # learning_rate: Union[float, Schedule] = 3e-4,
         # The learning rate, it can be a function of the current progress remaining (from 1 to 0)
         "learning_rate": {
-            "values": [6e-4, 2e-4]
+            "values": [6e-4]
         },
 
         # batch_size: Optional[int] = 64,
@@ -150,10 +133,10 @@ tuning_results = {
         # 'net_arch_n_layers' and 'net_arch_n_size' will result in a dict that will be passed to 'net_arch'
         # see code below
         "net_arch_n_layers": {
-            'values': [1, 2]
+            'values': [2]
         },
         "net_arch_n_size": {
-            "values": [90, 20]
+            "values": [90]
         },
 
         # ortho_init: bool = True,
@@ -170,14 +153,12 @@ tuning_results = {
         # https://pytorch.org/docs/stable/nn.html
         "activation_fn": {
             "values": [
-                "ReLu",  # th.nn.ReLU
-                "ELU",
                 "RRELU",
             ]
         },
 
         "optimizer_eps": {  # for th.optim.Adam
-            "values": [1e-7, 1e-8]
+            "values": [1e-7]
         },
 
         # env params
@@ -191,7 +172,7 @@ tuning_results = {
             'values': [True]
         },
         "perform_left_shift_if_possible": {
-            'values': [True, False]
+            'values': [True]
         },
         "dtype": {
             'values': ["float32"]
@@ -202,6 +183,8 @@ tuning_results = {
             'value': 50
         }
     }
+
+
 ppo_icm_sweep_config_random = {
     'method': 'random',
     'name': generate_name(),
@@ -217,7 +200,7 @@ ppo_icm_sweep_config_random = {
             'values': ["icm"]
         },
         "total_timesteps": {
-            'values': [50_000]
+            'values': [40_000]
         },
         "n_envs": {
             'values': [8]
@@ -342,15 +325,70 @@ ppo_icm_sweep_config_random = {
     }
 }
 
-
-if __name__ == '__main__':
-    import wandb as wb
-    from jss_rl.sb3.experiments.jss.jss_ppo_perform_sweep_run import perform_jss_run
-    sweep_id = wb.sweep(ppo_icm_sweep_config_random, project="testo")
-    # sweep_id = "sen6u09f"  # icm random sweep
+def run_sweep(project: str, sweep_id: str = None, new_sweep: bool = False, count: int = None, **_) -> None:
+    wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
+    if not project:
+        raise ValueError("'project' must not be `None`!")
+    if sweep_id and new_sweep:
+        raise ValueError("'sweep_id' must be `None` if 'new_sweep' is `True`")
+    if new_sweep:
+        sweep_id = wb.sweep(ppo_icm_sweep_config_random, project=project)
+        if count is None:
+            log.info(f"your 'sweep_id' is `{sweep_id}`. rerun this script with the '-c'/'--count'-argument specified "
+                     f"to perform runs for the sweep.")
+            return
+    if count is None:
+        raise ValueError("for sweeps with `method='random'` 'count' must be specified!")
     wb.agent(
         sweep_id,
         function=perform_jss_run,
-        count=3,
-        project="testo"
+        count=count,
+        project=project
     )
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+
+    parser.add_argument("-p", "--project",
+                        dest="project",
+                        help="the wandb project to which the result will be logged",
+                        default="MA-nasuta"
+                        )
+
+    parser.add_argument("-sid", "--sweep_id",
+                        dest="sweep_id",
+                        help="the id of an existing sweep in wandb. "
+                             "The performed runs will be logged to the specified sweep.",
+                        default=None
+                        )
+
+    parser.add_argument("-n", "--new",
+                        dest="new_sweep",
+                        type=bool,
+                        help="a new sweep will be created if set to `True`",
+                        default=False
+                        )
+
+    parser.add_argument("-c", "--count",
+                        dest="count",
+                        type=int,
+                        help="the number of runs that shall be performed",
+                        default=None
+                        )
+
+    parser.add_argument("-cost", "--cost",
+                        dest="cost",
+                        type=bool,
+                        help="extrapolate cost based on one run",
+                        default=False
+                        )
+
+    args = vars(parser.parse_args())
+    if args["cost"]:
+        extrapolate_cost(
+            callable_function=run_sweep,
+            function_kwargs={**args, "count": 1}
+        )
+    else:
+        run_sweep(**args)

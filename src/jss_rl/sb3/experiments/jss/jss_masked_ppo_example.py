@@ -176,7 +176,7 @@ def run_jss_masked_ppo_example(total_timesteps: int = 100_000, *,
 if __name__ == '__main__':
     wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
 
-    jsp_instance, jsp_instance_details = env_utils.get_benchmark_instance_and_details(name="ft06")
+    jsp_instance, jsp_instance_details = env_utils.get_benchmark_instance_and_details(name="ta01")
 
     run_jss_masked_ppo_example(
         project="test",
@@ -184,6 +184,6 @@ if __name__ == '__main__':
         jsp_instance_details=jsp_instance_details,
         is_benchmark_instance=True,
         scaling_divisor=jsp_instance_details["lower_bound"],
-        instance_name="ft06",
-        total_timesteps=50_000,
+        instance_name="ta01",
+        total_timesteps=150_000,
     )
