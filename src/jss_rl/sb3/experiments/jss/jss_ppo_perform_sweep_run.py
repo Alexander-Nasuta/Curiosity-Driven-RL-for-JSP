@@ -147,7 +147,7 @@ def perform_jss_run() -> None:
         elif sweep_params["activation_fn"] == 'ELU':
             activation_fn = th.nn.ELU
         elif sweep_params["activation_fn"] == 'RRELU':
-            activation_fn = th.nn.ELU
+            activation_fn = th.nn.PReLU
         else:
             raise NotImplementedError(f"activation function '{activation_fn}' is not available/implemented. "
                                       f"You may need to add a case for your activation function")

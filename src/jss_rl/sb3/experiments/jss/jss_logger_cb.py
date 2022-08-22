@@ -50,10 +50,10 @@ class JssLoggerCallback(BaseCallback):
     def _on_step(self) -> bool:
 
         self.visited_states = self.visited_states.union(
-            [tuple(torch.ravel(obs).tolist()) for obs in self.locals["obs_tensor"]])
+            [hash(tuple(torch.ravel(obs).tolist())) for obs in self.locals["obs_tensor"]])
 
         self.visited_state_action_pairs = self.visited_state_action_pairs.union(
-            [(tuple(torch.ravel(obs).tolist()), action) for obs, action in
+            [hash((tuple(torch.ravel(obs).tolist()), action)) for obs, action in
              zip(self.locals["obs_tensor"], self.locals["actions"])]
         )
 

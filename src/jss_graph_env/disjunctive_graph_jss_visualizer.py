@@ -13,7 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.figure_factory as ff
 
-from typing import Union
+from typing import Union, Tuple, List
 
 from jss_utils.jss_logger import log
 
@@ -71,7 +71,7 @@ class DisjunctiveGraphJspVisualizer:
             return f(*[int(n * 255) for n in [r, g, b]])
 
     @staticmethod
-    def wrap_with_color_codes(s: object, /, r: Union[int, float], g: Union[int, float], b: Union[int, float], **kwargs)\
+    def wrap_with_color_codes(s: object, /, r: Union[int, float], g: Union[int, float], b: Union[int, float], **kwargs) \
             -> str:
         """
         stringify an object and wrap it with console color codes. It adds the color control sequence in front and one
@@ -166,7 +166,7 @@ class DisjunctiveGraphJspVisualizer:
                     chart_str = [
                         f"{DisjunctiveGraphJspVisualizer.rgb_color_sequence(*colors[resource])}█"
                         if not isinstance(v, str)
-                        and start <= v <= finish
+                           and start <= v <= finish
                         else v for v in chart_str
                     ]
                 prefix = f"{f'{j}':<{len_prefix - 1}}║" if j else f"{'':<{len_prefix - 1}}║"
@@ -512,3 +512,79 @@ class DisjunctiveGraphJspVisualizer:
                              f"are allowed here.")
 
         return vis
+
+    @staticmethod
+    def latex_tikz_figure_gantt(df: pd.DataFrame, *, colors: dict,
+                                xfaktor: float = 1.0,
+                                yfaktor: float = 1.0,
+                                x_axis_label: str = "$T$",
+                                y_axis_label: str = "") -> str:
+        new_line = "\n"
+
+        bs = "\\"
+
+        jobs = df['Task'].unique()
+
+        job_offset_mapping = [ (job, i * yfaktor + yfaktor * 0.5) for i, job in enumerate(jobs, start=1)]
+
+        def in_curly_brakets(s) -> str:
+            return "{" + str(s) + "}"
+
+        def latex_loop_expression(tuple_list:List[Tuple]) -> str:
+            str_tupel_list = [
+                [
+                    str(e) for e in t_list
+                ]
+                for t_list in tuple_list
+            ]
+            tupel_expressions = ["/".join(t) for t in str_tupel_list]
+            return in_curly_brakets(",".join(tupel_expressions))
+
+        df_dict = df.to_dict()
+        print(df_dict)
+
+        latex_code = f"""
+\\begin{{figure}}[ht!]
+\centering
+\\begin{{tikzpicture}}
+    
+{
+        new_line.join([
+            bs + f"xdefinecolor" 
+            + in_curly_brakets(machine) 
+            + in_curly_brakets("rgb")
+            + "{" + str(r) + "," + str(g) + "," + str(b) + "}"
+                       for machine, (r, g, b, *_) in colors.items()])
+        }
+        
+\def\\xmax{in_curly_brakets(15)}
+\def\ymax{in_curly_brakets(2.5)}
+\def\\xtik{in_curly_brakets(2)}
+
+\def\\xfaktor{in_curly_brakets(xfaktor)}
+\def\yfaktor{in_curly_brakets(yfaktor)}
+
+\def\yAxisLabel{in_curly_brakets(y_axis_label)}
+\def\\xLabel{in_curly_brakets(x_axis_label)}
+
+% Axis
+\coordinate (y) at (0,\ymax*\yfaktor);
+\coordinate (x) at (\\xmax*\\xfaktor,0);
+
+\draw[->] (y) node[above] {in_curly_brakets(y_axis_label)} -- (0,0) --  (x) node[right]{in_curly_brakets(x_axis_label)};
+
+% X Axis ticks
+\\foreach \\x/\\xtext in {{0,\\xtik,...,\\xmax}}
+\draw[shift={in_curly_brakets('(' + bs + 'x' + '*' + bs + 'xfaktor' + ',0)')}] (0pt,2pt) -- (0pt,-2pt) node[below] {in_curly_brakets('$' + bs + 'xtext$')};
+
+% Y Axis ticks
+\\foreach \\task/\\offset in {latex_loop_expression(job_offset_mapping)}
+\draw ($(0,\\offset)-(0.25,0.25)$) node[ align=right, anchor=east] {in_curly_brakets(bs + "task")};
+
+    
+\end{{tikzpicture}}
+\caption{{fancy caption}}
+\label{{ch00:fig:fancylabel}}
+\end{{figure}}
+"""
+        return latex_code
