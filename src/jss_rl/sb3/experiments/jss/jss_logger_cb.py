@@ -12,10 +12,11 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 class JssLoggerCallback(BaseCallback):
 
-    def __init__(self, wandb_ref: ModuleType = wb, verbose=0):
+    def __init__(self, wandb_ref: ModuleType = wb, timestep_offset: int = 0, verbose=0):
         super(JssLoggerCallback, self).__init__(verbose)
 
         self.wandb_ref = wandb_ref
+        self.timestep_offset = timestep_offset
 
         self.visited_states = set()
         self.visited_state_action_pairs = set()
@@ -77,7 +78,7 @@ class JssLoggerCallback(BaseCallback):
                 "total_left_shifts": self.total_left_shifts,
                 "left_shift_moving_avg_100_pct": sum(self.last_100_left_shifts) / len(self.last_100_left_shifts) * 100,
                 "left_shift_pct": self.total_left_shifts / self.num_timesteps * 100,
-                "num_timesteps": self.num_timesteps
+                "num_timesteps": self.num_timesteps + self.timestep_offset
             })
 
         return True

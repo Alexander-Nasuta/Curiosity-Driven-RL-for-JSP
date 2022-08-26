@@ -6,42 +6,38 @@ import jss_utils.PATHS as PATHS
 
 from rich.progress import Progress
 
-from jss_rl.sb3.experiments.jss.jsp_6x6.jss_experiment_ec_6x6 import run_ppo_ec_jss_experiment_6x6
-from jss_rl.sb3.experiments.jss.jsp_6x6.jss_experiment_icm_6x6 import run_ppo_icm_jss_experiment_6x6
-from jss_rl.sb3.experiments.jss.jsp_6x6.jss_experiment_plain_ppo_6x6 import run_ppo_jss_experiment_6x6
+from jss_rl.sb3.experiments.jss.jsp_10x10.jss_experiment_icm_10x10 import run_ppo_icm_jss_experiment_10x10
+from jss_rl.sb3.experiments.jss.jsp_10x10.jss_experiment_plain_ppo_10x10 import run_ppo_jss_experiment_10x10
 from jss_utils.jss_logger import log
 from jss_utils.name_generator import generate_name
 
 
-def run_experiment_series_6x6(total_timesteps: int, instance_name: str, wb_project: str, num_runs_per_module: int = 10) \
-        -> None:
+def run_experiment_series_10x10(total_timesteps: int, instance_name: str, wb_project: str,
+                                num_runs_per_module: int = 1) -> None:
     name = generate_name()
     additional_config = {
-        "series_id": 'Purple_Lemon_95_ed306729'
+        # "series_id": 'Vantablack_Lemon_45_db056561'
+        "series_id": "Green_Coconut_16_5e3e9a40"
         # "series_id": name
     }
     log.info(f"running an experiment series ('{name}') on 'GraphJsp-v0' environment.")
 
     with Progress() as progress:
-        task1 = progress.add_task("[cyan]PPO", total=num_runs_per_module)
+        #task1 = progress.add_task("[cyan]PPO", total=num_runs_per_module)
         task2 = progress.add_task("[cyan]PPO + ICM", total=num_runs_per_module)
-        task3 = progress.add_task("[cyan]PPO + EC", total=num_runs_per_module)
 
         for algo, task, experiment_function in zip(
                 [
-                    "PPO",
-                    "PPO + ICM",
-                    "PPO + EC"
+                    #"PPO",
+                    "PPO + ICM"
                 ],
                 [
-                    task1,
-                    task2,
-                    task3
+                    #task1,
+                    task2
                 ],
                 [
-                    run_ppo_jss_experiment_6x6,
-                    run_ppo_icm_jss_experiment_6x6,
-                    run_ppo_ec_jss_experiment_6x6
+                   # run_ppo_jss_experiment_10x10,
+                   run_ppo_icm_jss_experiment_10x10
                 ]
         ):
             log.info(f"running experiments with {algo} algorithm.")
@@ -63,11 +59,11 @@ if __name__ == '__main__':
         kwargs={},
     )
     wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
-    # Purple_Lime_30_b5f4822e (wrong icm parametrisation, 150_000 steps)
-    # Purple_Lemon_95_ed306729 (fixed parameters 500_000 steps)
-    run_experiment_series_6x6(
-        total_timesteps=500_000,
-        instance_name="ft06",
+    # Vantablack_Lemon_45_db056561
+    # Green_Coconut_16_5e3e9a40
+    run_experiment_series_10x10(
+        total_timesteps=4_000_000,
+        instance_name="ft10",
         wb_project="MA-nasuta",
-        num_runs_per_module=5
+        num_runs_per_module=1
     )
