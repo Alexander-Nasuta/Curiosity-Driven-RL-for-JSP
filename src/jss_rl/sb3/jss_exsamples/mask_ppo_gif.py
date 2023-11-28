@@ -17,7 +17,7 @@ from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 
 
 def train_and_create_gif(jsp_instance: np.ndarray, lower_bound: int,
-                         total_timesteps: int = 2_000, filename: str = "mask_ppo") -> None:
+                         total_timesteps: int = 2_000, filename: str = "mask_ppo_gif") -> None:
     env = DisjunctiveGraphJssEnv(
         jps_instance=jsp_instance,
         perform_left_shift_if_possible=True,

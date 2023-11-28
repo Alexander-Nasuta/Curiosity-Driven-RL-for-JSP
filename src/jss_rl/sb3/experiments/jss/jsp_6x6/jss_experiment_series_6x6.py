@@ -23,23 +23,23 @@ def run_experiment_series_6x6(total_timesteps: int, instance_name: str, wb_proje
     log.info(f"running an experiment series ('{name}') on 'GraphJsp-v0' environment.")
 
     with Progress() as progress:
-        task1 = progress.add_task("[cyan]PPO", total=num_runs_per_module)
+        #task1 = progress.add_task("[cyan]PPO", total=num_runs_per_module)
         task2 = progress.add_task("[cyan]PPO + ICM", total=num_runs_per_module)
         task3 = progress.add_task("[cyan]PPO + EC", total=num_runs_per_module)
 
         for algo, task, experiment_function in zip(
                 [
-                    "PPO",
+                    #"PPO",
                     "PPO + ICM",
                     "PPO + EC"
                 ],
                 [
-                    task1,
+                    #task1,
                     task2,
                     task3
                 ],
                 [
-                    run_ppo_jss_experiment_6x6,
+                    #run_ppo_jss_experiment_6x6,
                     run_ppo_icm_jss_experiment_6x6,
                     run_ppo_ec_jss_experiment_6x6
                 ]
@@ -69,5 +69,5 @@ if __name__ == '__main__':
         total_timesteps=500_000,
         instance_name="ft06",
         wb_project="MA-nasuta",
-        num_runs_per_module=5
+        num_runs_per_module=3
     )

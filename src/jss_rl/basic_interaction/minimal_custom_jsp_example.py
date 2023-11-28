@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import jss_utils.jsp_or_tools_solver as or_tools_solver
 from jss_graph_env.disjunctive_graph_jss_env import DisjunctiveGraphJssEnv
@@ -17,7 +19,10 @@ def ma_jsp_example() -> None:
         ]
 
     ])
+
     _, _, df, _ = or_tools_solver.solve_jsp(jsp_instance=jsp, plot_results=True)
+    print(df.to_dict())
+    sys.exit(1)
 
     c_map = plt.cm.get_cmap("jet")  # select the desired cmap
     arr = np.linspace(0, 1, 4)  # create a list with numbers from 0 to 1 with n items
@@ -33,13 +38,17 @@ def ma_jsp_example() -> None:
     #visualizer.render_gantt_in_window(df=df, colors=colors, wait=None)
     latex_code = visualizer.latex_tikz_figure_gantt(df=df, colors=colors)
     print(latex_code)
-    env = DisjunctiveGraphJssEnv(jps_instance=jsp)
+    env = DisjunctiveGraphJssEnv(jps_instance=jsp, normalize_observation_space=True, flat_observation_space=False)
     # env.render(show=["graph_window"], wait=None)
-    for s in [4, 5, 0, 1, 6,
-              2, 3, 7
+    for s in [4, 0,
+              #0, 1, 6,
+              #2,
+              #3, 7
               ]:
-        env.step(s)
-    env.render(show=["graph_window"], wait=None)
+        obs, *_ = env.step(s)
+        env.render()
+    print(obs)
+    env.render(show=["gantt_console", "graph_console", "gantt_window"], wait=None)
 
 
 if __name__ == '__main__':

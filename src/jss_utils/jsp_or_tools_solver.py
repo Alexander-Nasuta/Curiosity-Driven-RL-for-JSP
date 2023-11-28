@@ -125,7 +125,7 @@ def solve_jsp(jsp_instance: np.ndarray, plot_results: bool = True) -> (float, st
 
 
 if __name__ == '__main__':
-    instance_name = "ta01"
+    instance_name = "ft06"
 
     jsp = parser.get_instance_by_name(instance_name)
     makespan, status, *_ = solve_jsp(jsp_instance=jsp)

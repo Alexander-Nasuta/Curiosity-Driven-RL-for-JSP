@@ -41,8 +41,9 @@ def run_experiment_series(total_timesteps: int, wb_project: str, num_runs_per_mo
 
 if __name__ == '__main__':
     wb.tensorboard.patch(root_logdir=str(PATHS.WANDB_PATH))
+    # Skyblue_Strawberry_93_a22a47ff
     run_experiment_series(
-        total_timesteps=20_000,
-        wb_project="test",
-        num_runs_per_module=2
+        total_timesteps=30_000,
+        wb_project="MA-nasuta",
+        num_runs_per_module=10
     )

@@ -21,7 +21,7 @@ from jss_utils.jss_logger import log
 
 
 def run_ppo_ec_jss_experiment_6x6(total_timesteps: int, *, instance_name: str,
-                           project: str, group="PPO + EC", additional_config=None):
+                                  project: str, group="PPO + EC", additional_config=None):
     if additional_config is None:
         additional_config = {}
 
@@ -91,8 +91,12 @@ def run_ppo_ec_jss_experiment_6x6(total_timesteps: int, *, instance_name: str,
             "beta": 0.5,
             "gamma": 2,
             "embedding_dim": 288,
+            "embedding_net_hiddens": [80],
             "episodic_memory_capacity": 500,
             "clear_memory_every_episode": False,
+            "comparator_net_hiddens": [80, 80, 80],
+            "comparator_net_activation": "relu",
+            "lr": 0.005,
             "exploration_steps": total_timesteps * 30_000 / 40_000,
         }
     }

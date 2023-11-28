@@ -1,1 +1,1 @@
-enter your wandb api key here and rename the file to 'wandb_api_key_file'
+enter your wandb api key here and rename the file to 'wandb_api_key_file'. this file is only required for RLlib/ray

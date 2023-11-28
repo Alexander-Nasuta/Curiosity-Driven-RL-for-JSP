@@ -212,7 +212,6 @@ grid_ppo_sweep_config = {
             'value': 50
         }
 
-
     }
 }
 

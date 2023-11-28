@@ -7,8 +7,8 @@ except KeyError:
     logname = "qwerty"
 
 
-LAST_UPDATED = "30.05.22"
-VERSION = "0.0.4"
+LAST_UPDATED = "09.09.22"
+VERSION = "0.0.5"
 
 
 CRWTH_BLUE = '\033[38;2;34;83;154m'

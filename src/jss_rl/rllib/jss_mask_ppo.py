@@ -93,6 +93,7 @@ def run_mask_ppo_trainer(jsp_instance: np.ndarray, jsp_instance_details: Dict) -
         "custom_model_config": {}
     }
 
+
     trainer = PPOTrainer(config=config)
 
     for i in range(1):
